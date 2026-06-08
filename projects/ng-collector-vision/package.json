@@ -2,6 +2,10 @@
   "name": "@cybey/ng-collector-vision",
   "version": "0.0.1",
   "license": "AGPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/arjenbrandenburgh/ng-collector-vision"
+  },
   "peerDependencies": {
     "@angular/common": "^22.0.0",
     "@angular/core": "^22.0.0"
