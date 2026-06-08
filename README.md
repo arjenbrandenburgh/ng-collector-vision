@@ -6,6 +6,8 @@ Angular 22 component library that wraps [CollectorVision](https://github.com/Han
 <cv-card-scanner game="magic" (cardDetected)="onCard($event)" />
 ```
 
+**[Live demo →](https://arjenbrandenburgh.github.io/ng-collector-vision/)**
+
 ---
 
 ## Built on CollectorVision
