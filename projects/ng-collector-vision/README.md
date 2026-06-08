@@ -8,7 +8,7 @@ Point a camera at a Magic: The Gathering, Pokémon, Lorcana, or One Piece card. 
 <cv-card-scanner game="magic" (cardDetected)="onCard($event)" />
 ```
 
-[![npm version](https://img.shields.io/npm/v/ng-collector-vision.svg)](https://www.npmjs.com/package/ng-collector-vision)
+[![npm version](https://img.shields.io/npm/v/%40cybey%2Fng-collector-vision.svg)](https://www.npmjs.com/package/@cybey/ng-collector-vision)
 [![license: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](https://github.com/HanClinto/CollectorVision/blob/main/LICENSE)
 
 **[Live demo →](https://arjenbrandenburgh.github.io/ng-collector-vision/)**
