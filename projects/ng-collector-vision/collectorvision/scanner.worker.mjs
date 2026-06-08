@@ -1354,7 +1354,7 @@ self.onmessage = async ({ data }) => {
   try {
     if (data.type === 'init') {
       if (data.assetBase) _assetBase = data.assetBase;
-      if (data.wasmBase)  ort.env.wasm.wasmPaths = data.wasmBase;
+      if (data.wasmBase) ort.env.wasm.wasmPaths = data.wasmBase;
       const enableWebGpu = data.enableWebGpu === true;
       const webgpuReady = enableWebGpu ? await configureWebGpu() : false;
       const useWebGpu = webgpuReady; // only true if both requested and available

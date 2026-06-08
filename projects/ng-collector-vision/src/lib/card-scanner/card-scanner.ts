@@ -98,7 +98,7 @@ export class CardScannerComponent {
   // ── Services ──────────────────────────────────────────────────────────────
 
   readonly #assetBase = inject(CV_ASSET_BASE_PATH);
-  readonly #wasmBase  = inject(CV_WASM_BASE_PATH);
+  readonly #wasmBase = inject(CV_WASM_BASE_PATH);
 
   // ── Signals ───────────────────────────────────────────────────────────────
 
@@ -254,7 +254,7 @@ export class CardScannerComponent {
         type: 'init',
         manifest,
         assetBase: this.#assetBase,
-        wasmBase:  this.#wasmBase,
+        wasmBase: this.#wasmBase,
         enableWebGpu: false,
         minCornerConfidence: this.minCornerConfidence(),
       });
