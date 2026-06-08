@@ -217,22 +217,6 @@ providers: [
 ]
 ```
 
-### Theming
-
-The component exposes CSS custom properties for theming:
-
-```css
-cv-card-scanner {
-  --cv-primary:    #5b2c90;   /* progress text, Try again button */
-  --cv-danger:     #ef4444;   /* error alert */
-  --cv-warning:    #f59e0b;   /* uncertain-scan viewfinder ring */
-  --cv-text:       #111827;   /* status text */
-  --cv-text-muted: #6b7280;   /* hint text */
-  --cv-radius-md:  8px;       /* alert + button corners */
-  --cv-radius-lg:  12px;      /* viewfinder corners */
-}
-```
-
 ---
 
 ## Development
