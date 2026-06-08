@@ -19,7 +19,7 @@ export type {
 } from './lib/types';
 
 // Asset base path token
-export { CV_ASSET_BASE_PATH } from './lib/tokens';
+export { CV_ASSET_BASE_PATH, CV_WASM_BASE_PATH, ORT_CDN_WASM_PATH } from './lib/tokens';
 
 // Internal utilities exposed for advanced consumers
 export { ConfirmationBucket } from './lib/confirmation-bucket';
