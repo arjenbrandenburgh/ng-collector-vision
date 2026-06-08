@@ -24,7 +24,7 @@ import {
   SCAN_INTERVAL_MS,
   WORKER_FILENAME,
 } from '../constants';
-import { CV_ASSET_BASE_PATH } from '../tokens';
+import { CV_ASSET_BASE_PATH, CV_WASM_BASE_PATH } from '../tokens';
 import type {
   CardDetection,
   CardScannerGame,
@@ -98,6 +98,7 @@ export class CardScannerComponent {
   // ── Services ──────────────────────────────────────────────────────────────
 
   readonly #assetBase = inject(CV_ASSET_BASE_PATH);
+  readonly #wasmBase  = inject(CV_WASM_BASE_PATH);
 
   // ── Signals ───────────────────────────────────────────────────────────────
 
@@ -242,9 +243,6 @@ export class CardScannerComponent {
     }
 
     try {
-      // The worker must be same-origin (browser security requirement) and its
-      // static ./vendor/ imports must be co-located with it — so it always
-      // loads from the npm package path, never from CV_ASSET_BASE_PATH.
       this.#worker = new Worker(`collectorvision/${WORKER_FILENAME}`, { type: 'module' });
       this.#worker.addEventListener('message', (e: MessageEvent<WorkerMsg>) =>
         this.#onWorkerMessage(e.data),
@@ -256,6 +254,7 @@ export class CardScannerComponent {
         type: 'init',
         manifest,
         assetBase: this.#assetBase,
+        wasmBase:  this.#wasmBase,
         enableWebGpu: false,
         minCornerConfidence: this.minCornerConfidence(),
       });
