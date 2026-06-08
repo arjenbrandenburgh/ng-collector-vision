@@ -242,7 +242,10 @@ export class CardScannerComponent {
     }
 
     try {
-      this.#worker = new Worker(`${this.#assetBase}/${WORKER_FILENAME}`, { type: 'module' });
+      // The worker must be same-origin (browser security requirement) and its
+      // static ./vendor/ imports must be co-located with it — so it always
+      // loads from the npm package path, never from CV_ASSET_BASE_PATH.
+      this.#worker = new Worker(`collectorvision/${WORKER_FILENAME}`, { type: 'module' });
       this.#worker.addEventListener('message', (e: MessageEvent<WorkerMsg>) =>
         this.#onWorkerMessage(e.data),
       );
