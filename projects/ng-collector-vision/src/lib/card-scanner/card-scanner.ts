@@ -252,6 +252,7 @@ export class CardScannerComponent {
       this.#worker.postMessage({
         type: 'init',
         manifest,
+        assetBase: this.#assetBase,
         enableWebGpu: false,
         minCornerConfidence: this.minCornerConfidence(),
       });
