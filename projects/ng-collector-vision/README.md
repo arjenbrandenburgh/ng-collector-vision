@@ -402,7 +402,7 @@ Where `scanner` is a `viewChild(CardScannerComponent)` reference.
 ```ts
 import { CV_ASSET_BASE_PATH } from '@cybey/ng-collector-vision';
 
-providers: [{ provide: CV_ASSET_BASE_PATH, useValue: 'https://platform.example.com' }]
+providers: [{ provide: CV_ASSET_BASE_PATH, useValue: 'https://platform.example.com' }];
 ```
 
 > **Note:** `scanner.worker.mjs` and its bundled vendor files always load from the **local** origin — cross-origin workers require explicit `Access-Control-Allow-Origin` headers that most servers don't provide. `CV_ASSET_BASE_PATH` does not control the worker path.
@@ -414,13 +414,13 @@ The bundled ONNX Runtime WASM binary (`ort-wasm-simd-threaded.asyncify.wasm`) is
 ```ts
 import { CV_WASM_BASE_PATH, ORT_CDN_WASM_PATH } from '@cybey/ng-collector-vision';
 
-providers: [{ provide: CV_WASM_BASE_PATH, useValue: ORT_CDN_WASM_PATH }]
+providers: [{ provide: CV_WASM_BASE_PATH, useValue: ORT_CDN_WASM_PATH }];
 ```
 
 `ORT_CDN_WASM_PATH` points to `onnxruntime-web@1.24.3` on jsDelivr. Alternatively, use your own R2 bucket or any URL that serves the WASM with correct `Content-Type: application/wasm` headers:
 
 ```ts
-providers: [{ provide: CV_WASM_BASE_PATH, useValue: 'https://pub-xxx.r2.dev/wasm/' }]
+providers: [{ provide: CV_WASM_BASE_PATH, useValue: 'https://pub-xxx.r2.dev/wasm/' }];
 ```
 
 The WASM file remains in the npm package for hosts that can serve it locally — `CV_WASM_BASE_PATH` is purely opt-in.

@@ -214,7 +214,7 @@ type ScannerStatus =
 ```ts
 import { CV_ASSET_BASE_PATH } from '@cybey/ng-collector-vision';
 
-providers: [{ provide: CV_ASSET_BASE_PATH, useValue: 'https://platform.example.com' }]
+providers: [{ provide: CV_ASSET_BASE_PATH, useValue: 'https://platform.example.com' }];
 ```
 
 The scanner worker and vendor files always load from the **local** origin — cross-origin workers require explicit CORS headers that most hosts don't provide.
@@ -226,13 +226,13 @@ The bundled ONNX Runtime WASM binary is ~27 MB. Cloudflare Pages has a 25 MB per
 ```ts
 import { CV_WASM_BASE_PATH, ORT_CDN_WASM_PATH } from '@cybey/ng-collector-vision';
 
-providers: [{ provide: CV_WASM_BASE_PATH, useValue: ORT_CDN_WASM_PATH }]
+providers: [{ provide: CV_WASM_BASE_PATH, useValue: ORT_CDN_WASM_PATH }];
 ```
 
 Or point at your own R2 bucket:
 
 ```ts
-providers: [{ provide: CV_WASM_BASE_PATH, useValue: 'https://pub-xxx.r2.dev/wasm/' }]
+providers: [{ provide: CV_WASM_BASE_PATH, useValue: 'https://pub-xxx.r2.dev/wasm/' }];
 ```
 
 ---
