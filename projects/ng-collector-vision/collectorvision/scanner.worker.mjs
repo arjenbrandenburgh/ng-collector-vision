@@ -17,19 +17,20 @@
 //                       detectorBitmap?, cropBitmap? }
 //   { type: 'error',    message }
 
-import * as ort from 'https://vision.hippolink.app/vendor/onnxruntime-web/ort.webgpu.min.mjs';
+import * as ort from './vendor/onnxruntime-web/ort.webgpu.min.mjs';
 
-// ---------------------------------------------------------------------------
-// HippoLink patch: all CollectorVision assets (models, catalogs, vendor files)
-// are served from vision.hippolink.app. The worker is served locally so that
-// it can be bundled with the Angular app, but every fetch it makes points to
-// the remote host. Absolute https:// paths are passed through unchanged.
-// ---------------------------------------------------------------------------
-const CV_BASE = 'https://vision.hippolink.app';
+// Asset base path received from the Angular component via the init message.
+// Matches CV_ASSET_BASE_PATH (default: 'collectorvision').
+let _assetBase = 'collectorvision';
 
+// Resolve a manifest asset path.
+// - Absolute URLs (https://…) are returned unchanged.
+// - Relative paths are prefixed with _assetBase so they resolve correctly
+//   regardless of where the worker script itself is hosted.
 function assetUrl(path) {
   if (!path) return path;
-  return /^https?:\/\//.test(path) ? path : `${CV_BASE}/assets/${path}`;
+  if (/^https?:\/\//.test(path)) return path;
+  return `${_assetBase}/${path}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -369,7 +370,7 @@ async function writeCachedAsset(key, value) {
 }
 
 // ---------------------------------------------------------------------------
-// HippoLink patch: HuggingFace .npz catalog support
+// HuggingFace .npz catalog support
 //
 // The CollectorVision Python library publishes catalogs to HuggingFace as
 // NumPy archives (.npz).  The browser scanner originally expected pre-converted
@@ -1352,6 +1353,7 @@ function roundTiming(timing) {
 self.onmessage = async ({ data }) => {
   try {
     if (data.type === 'init') {
+      if (data.assetBase) _assetBase = data.assetBase;
       const enableWebGpu = data.enableWebGpu === true;
       const webgpuReady = enableWebGpu ? await configureWebGpu() : false;
       const useWebGpu = webgpuReady; // only true if both requested and available
