@@ -1,0 +1,12 @@
+{
+  "version": "2026-05-07",
+  "models": {
+    "cornelius": "https://hanclinto.github.io/CollectorVision/assets/models/cornelius.onnx",
+    "milo": "https://hanclinto.github.io/CollectorVision/assets/models/milo.onnx"
+  },
+  "catalog": {
+    "huggingface_key": "tcgplayer-pokemon",
+    "dims": 128,
+    "rows": 0
+  }
+}
