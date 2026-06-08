@@ -1,0 +1,61 @@
+name: Deploy demo to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Only one deployment runs at a time; cancel in-progress on new push.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    name: Build demo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # The demo's angular.json pulls from dist/ng-collector-vision, so the lib
+      # must be built first.
+      - name: Build library
+        run: npx ng build ng-collector-vision --configuration production
+
+      # Derive the base href from the repo name so the build works for any fork.
+      # e.g. "acme/ng-collector-vision" → base href "/ng-collector-vision/"
+      - name: Build demo
+        run: |
+          REPO_NAME="${GITHUB_REPOSITORY##*/}"
+          npx ng build demo \
+            --configuration production \
+            --base-href "/$REPO_NAME/"
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/demo/browser
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

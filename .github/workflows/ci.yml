@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-format:
+    name: Lint & format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Prettier check
+        run: npx prettier --check .
+
+      - name: TypeScript type-check (lib)
+        run: npx tsc -p projects/ng-collector-vision/tsconfig.lib.json --noEmit
+
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run library tests
+        run: npx ng test ng-collector-vision --watch=false
+
+  build:
+    name: Build library
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build ng-collector-vision
+        run: npx ng build ng-collector-vision --configuration production
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: dist-ng-collector-vision
+          path: dist/ng-collector-vision
+          retention-days: 7
