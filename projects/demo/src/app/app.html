@@ -1,0 +1,308 @@
+<div class="demo">
+  <!-- ── Left pane: scanner ───────────────────────────────────────────── -->
+  <aside class="demo__scanner-pane">
+    <header class="demo__scanner-header">
+      <div class="demo__scanner-brand">
+        <span class="demo__logo-mark">cv</span>
+        <span class="demo__brand-name">ng-collector-vision</span>
+      </div>
+
+      <!-- Game picker -->
+      <div class="demo__game-picker" role="radiogroup" aria-label="Select game">
+        @for (opt of gameOptions; track opt.value) {
+        <button
+          type="button"
+          role="radio"
+          [attr.aria-checked]="selectedGame() === opt.value"
+          class="demo__game-pill"
+          [class.demo__game-pill--active]="selectedGame() === opt.value"
+          (click)="selectGame(opt.value)"
+        >
+          {{ opt.label }}
+        </button>
+        }
+      </div>
+    </header>
+
+    <!-- Settings panel -->
+    <div class="demo__settings">
+      <div class="demo__settings-grid">
+
+        <label class="demo__setting">
+          <span class="demo__setting-label">
+            Corner threshold
+            <span class="demo__setting-value">{{ cornerThreshold() }}</span>
+          </span>
+          <input
+            type="range" min="0" max="0.1" step="0.01"
+            [value]="cornerThreshold()"
+            (input)="cornerThreshold.set(+$any($event.target).value)"
+            class="demo__slider"
+          />
+        </label>
+
+        <label class="demo__setting">
+          <span class="demo__setting-label">
+            ID threshold
+            <span class="demo__setting-value">{{ idThreshold() }}</span>
+          </span>
+          <input
+            type="range" min="0" max="1" step="0.05"
+            [value]="idThreshold()"
+            (input)="idThreshold.set(+$any($event.target).value)"
+            class="demo__slider"
+          />
+        </label>
+
+        <label class="demo__setting">
+          <span class="demo__setting-label">
+            Consecutive matches
+            <span class="demo__setting-value">{{ consecutiveScans() }}</span>
+          </span>
+          <input
+            type="range" min="1" max="6" step="1"
+            [value]="consecutiveScans()"
+            (input)="consecutiveScans.set(+$any($event.target).value)"
+            class="demo__slider"
+          />
+        </label>
+
+        <label class="demo__setting">
+          <span class="demo__setting-label">
+            Scan interval
+            <span class="demo__setting-value">{{ scanInterval() }}ms</span>
+          </span>
+          <input
+            type="range" min="100" max="1200" step="50"
+            [value]="scanInterval()"
+            (input)="scanInterval.set(+$any($event.target).value)"
+            class="demo__slider"
+          />
+        </label>
+
+        <label class="demo__setting">
+          <span class="demo__setting-label">
+            Cooldown
+            <span class="demo__setting-value">{{ cooldown() }}ms</span>
+          </span>
+          <input
+            type="range" min="500" max="8000" step="500"
+            [value]="cooldown()"
+            (input)="cooldown.set(+$any($event.target).value)"
+            class="demo__slider"
+          />
+        </label>
+
+        <label class="demo__setting demo__setting--toggle">
+          <input
+            type="checkbox"
+            [checked]="groupBySecondary()"
+            (change)="groupBySecondary.set($any($event.target).checked)"
+            class="demo__checkbox"
+          />
+          <span>Group by oracle ID</span>
+        </label>
+
+      </div>
+    </div>
+
+    @if (scannerOpen()) {
+    <div
+      class="demo__scanner-ring"
+      [class.demo__scanner-ring--confident]="scanner()?.viewfinderFlash() === 'confident'"
+      [class.demo__scanner-ring--uncertain]="scanner()?.viewfinderFlash() === 'uncertain'"
+    >
+      <cv-card-scanner
+        [game]="selectedGame()"
+        [minCornerConfidence]="cornerThreshold()"
+        [minAcceptanceScore]="idThreshold()"
+        [consecutiveMatches]="consecutiveScans()"
+        [scanIntervalMs]="scanInterval()"
+        [cooldownMs]="cooldown()"
+        [groupBySecondaryId]="groupBySecondary()"
+        (cardDetected)="onCardDetected($event)"
+        (scannerClosed)="onScannerClosed()"
+      />
+    </div>
+
+    @switch (scanner()?.status()) {
+      @case ('requesting-permission') {
+        <p class="demo__status-hint">Allow camera access to start scanning.</p>
+      }
+      @case ('downloading') {
+        <p class="demo__status-hint">Loading… {{ scanner()?.downloadProgress() }}%</p>
+      }
+      @case ('scanning') {
+        <p class="demo__status-hint">Point the camera at a card to scan it.</p>
+      }
+      @case ('error') {
+        <div class="demo__error-panel" role="alert">
+          <p class="demo__error-message">{{ scanner()?.errorMessage() }}</p>
+          <button type="button" class="demo__action-btn" (click)="scanner()?.openScanner()">
+            Try again
+          </button>
+        </div>
+      }
+    }
+
+    } @else {
+    <div class="demo__reopen">
+      <p class="demo__reopen-hint">Scanner is closed.</p>
+      <button type="button" class="demo__action-btn" (click)="openScanner()">Open Scanner</button>
+    </div>
+    }
+  </aside>
+
+  <!-- ── Right pane: scanned cards ────────────────────────────────────── -->
+  <main class="demo__list-pane">
+    <div class="demo__list-header">
+      <h2 class="demo__list-title">
+        Scanned cards @if (totalCount() > 0) {
+        <span class="demo__count-chip">{{ totalCount() }}</span>
+        }
+      </h2>
+      @if (cards().length > 0) {
+      <button type="button" class="demo__ghost-btn" (click)="clearAll()">Clear all</button>
+      }
+    </div>
+
+    @if (cards().length === 0) {
+    <div class="demo__empty" role="status">
+      <svg
+        class="demo__empty-icon"
+        width="48"
+        height="48"
+        viewBox="0 0 48 48"
+        fill="none"
+        aria-hidden="true"
+      >
+        <rect x="8" y="6" width="32" height="36" rx="4" stroke="currentColor" stroke-width="1.5" />
+        <path
+          d="M16 18h16M16 24h12M16 30h8"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+        />
+      </svg>
+      <p class="demo__empty-title">No cards scanned yet</p>
+      <p class="demo__empty-hint">Point the scanner at a card to add it here.</p>
+    </div>
+    }
+
+    <ul class="demo__card-list" role="list" aria-label="Scanned cards">
+      @for (card of cards(); track card.detection.cardId) {
+      <li
+        class="demo__card"
+        [class.demo__card--flash]="recentId() === card.detection.cardId"
+        [class.demo__card--review]="card.detection.needsReview"
+        [class.demo__card--loading]="card.loading"
+      >
+        <!-- Thumbnail -->
+        <div class="demo__thumb">
+          @if (card.thumbnailUrl) {
+          <img
+            [src]="card.thumbnailUrl"
+            [alt]="card.name"
+            class="demo__thumb-img"
+            loading="lazy"
+            width="46"
+            height="64"
+          />
+          } @else {
+          <div class="demo__thumb-placeholder" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+              <rect
+                x="2"
+                y="1"
+                width="18"
+                height="20"
+                rx="3"
+                stroke="currentColor"
+                stroke-width="1.5"
+              />
+              <circle cx="11" cy="9" r="3" stroke="currentColor" stroke-width="1.2" />
+              <path
+                d="M5 18c0-3.3 2.7-6 6-6s6 2.7 6 6"
+                stroke="currentColor"
+                stroke-width="1.2"
+                stroke-linecap="round"
+              />
+            </svg>
+          </div>
+          }
+        </div>
+
+        <!-- Identity -->
+        <div class="demo__card-info">
+          <p class="demo__card-name">
+            {{ card.name }} @if (card.detection.needsReview) {
+            <span
+              class="demo__review-flag"
+              role="img"
+              aria-label="Low confidence — please verify"
+              title="Low confidence — please verify"
+              >⚠</span
+            >
+            }
+          </p>
+          @if (card.setName) {
+          <p class="demo__card-set">
+            {{ card.setName }} @if (card.setCode) {
+            <span class="demo__card-code">{{ card.setCode }}</span>
+            }
+          </p>
+          }
+          <p class="demo__card-attrs">
+            score: {{ (card.detection.score * 100).toFixed(0) }}% @if (card.detection.orientation) {
+            · {{ card.detection.orientation }} }
+          </p>
+        </div>
+
+        <!-- Quantity stepper -->
+        <div class="demo__stepper" role="group" [attr.aria-label]="'Quantity for ' + (card.loading ? 'loading card' : card.name)">
+          <button
+            type="button"
+            class="demo__stepper-btn"
+            [disabled]="card.quantity <= 1"
+            [attr.aria-label]="'Decrease quantity of ' + (card.loading ? 'loading card' : card.name)"
+            (click)="decrement(card)"
+          >
+            −
+          </button>
+          <span
+            class="demo__stepper-count"
+            aria-live="polite"
+            [attr.aria-label]="card.quantity + ' copies'"
+            >{{ card.quantity }}</span
+          >
+          <button
+            type="button"
+            class="demo__stepper-btn"
+            [attr.aria-label]="'Increase quantity of ' + (card.loading ? 'loading card' : card.name)"
+            (click)="increment(card)"
+          >
+            +
+          </button>
+        </div>
+
+        <!-- Remove -->
+        <button
+          type="button"
+          class="demo__remove-btn"
+          [attr.aria-label]="'Remove ' + (card.loading ? 'loading card' : card.name) + ' from list'"
+          (click)="remove(card)"
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <path
+              d="M11 3L3 11M3 3l8 8"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+            />
+          </svg>
+        </button>
+      </li>
+      }
+    </ul>
+  </main>
+</div>
