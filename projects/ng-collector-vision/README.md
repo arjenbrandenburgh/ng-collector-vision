@@ -19,10 +19,10 @@ This library is an Angular wrapper around **[CollectorVision](https://github.com
 
 CollectorVision solves a hard computer vision problem: given a hand-held photo of a trading card (arbitrary angle, lighting, sleeve), identify the exact printing. It does this with two custom-trained ONNX neural networks:
 
-| Model | Role | Input | Output |
-|---|---|---|---|
-| **Cornelius** | Corner detector | 384 × 384 video frame | 4 corner points + presence confidence |
-| **Milo** | Card embedder | 448 × 448 dewarped crop | 128-dimensional fingerprint |
+| Model         | Role            | Input                   | Output                                |
+| ------------- | --------------- | ----------------------- | ------------------------------------- |
+| **Cornelius** | Corner detector | 384 × 384 video frame   | 4 corner points + presence confidence |
+| **Milo**      | Card embedder   | 448 × 448 dewarped crop | 128-dimensional fingerprint           |
 
 The fingerprint is matched against a catalog of ~108 k reference embeddings (cosine similarity, <10 ms on device). Catalogs are published as versioned `.npz` snapshots on [HuggingFace (HanClinto/milo)](https://huggingface.co/HanClinto/milo/tree/main/catalogs) and cached in IndexedDB after the first download.
 
@@ -81,9 +81,9 @@ Add this **before** the Angular bootstrap `<script>` tag:
 ```html
 <script>
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('coi-serviceworker.js').then(reg => {
+    navigator.serviceWorker.register('coi-serviceworker.js').then((reg) => {
       if (reg.installing) {
-        reg.installing.addEventListener('statechange', e => {
+        reg.installing.addEventListener('statechange', (e) => {
           if (e.target.state === 'activated') location.reload();
         });
       }
@@ -123,12 +123,12 @@ The manifest tells the worker where to find the ONNX models and which HuggingFac
 
 **Available catalogs** (from [HanClinto/milo on HuggingFace](https://huggingface.co/HanClinto/milo/tree/main/catalogs)):
 
-| Game | `huggingface_key` | Card ID format |
-|---|---|---|
-| Magic: The Gathering | `tcgplayer-mtg` | TCGplayer integer IDs |
-| Pokémon TCG | `tcgplayer-pokemon` | TCGplayer integer IDs |
-| Disney Lorcana | `tcgplayer-lorcana` | TCGplayer integer IDs |
-| One Piece Card Game | `tcgplayer-onepiece` | TCGplayer integer IDs |
+| Game                 | `huggingface_key`    | Card ID format        |
+| -------------------- | -------------------- | --------------------- |
+| Magic: The Gathering | `tcgplayer-mtg`      | TCGplayer integer IDs |
+| Pokémon TCG          | `tcgplayer-pokemon`  | TCGplayer integer IDs |
+| Disney Lorcana       | `tcgplayer-lorcana`  | TCGplayer integer IDs |
+| One Piece Card Game  | `tcgplayer-onepiece` | TCGplayer integer IDs |
 
 Models (~10 MB combined) and catalogs (~1–53 MB depending on game) download once and are cached in IndexedDB. Subsequent launches are instant, even offline.
 
@@ -186,18 +186,18 @@ export class MyScannerComponent {
 
 ### Inputs
 
-| Input | Type | Default | Description |
-|---|---|---|---|
-| `game` | `CardScannerGame` | **required** | Active game. Changing this value restarts the scanner. |
-| `minCornerConfidence` | `number` | `0.02` | Cornelius gate threshold `[0–1]`. Raise to reduce false positives in cluttered scenes. Updated live — no restart required. |
-| `minAcceptanceScore` | `number` | `0.5` | Minimum Milo cosine similarity before a frame is passed to the confirmation bucket `[0–1]`. Updated live. |
-| `consecutiveMatches` | `number` | `2` | Number of consecutive matching frames required before `cardDetected` fires. Higher = more certain, slower. Updated live. |
-| `cooldownMs` | `number` | `3500` | Cooldown (ms) before the same card can fire `cardDetected` again. Updated live. |
-| `groupBySecondaryId` | `boolean` | `true` | When `true`, alternate printings of the same card (same oracle/secondary ID) are grouped together for the confirmation streak. Updated live. |
-| `scanIntervalMs` | `number` | `900` | Interval between frame captures (ms). Minimum `100` recommended. Updated live. |
-| `playSounds` | `boolean` | `true` | Enable synthesized audio feedback. |
-| `confidentSoundUrl` | `string \| null` | `null` | WAV (or any Web Audio–decodable format) for a confident detection. `null` → synthesized two-note chime. |
-| `uncertainSoundUrl` | `string \| null` | `null` | Sound for a low-confidence detection. `null` → synthesized blip. |
+| Input                 | Type              | Default      | Description                                                                                                                                  |
+| --------------------- | ----------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `game`                | `CardScannerGame` | **required** | Active game. Changing this value restarts the scanner.                                                                                       |
+| `minCornerConfidence` | `number`          | `0.02`       | Cornelius gate threshold `[0–1]`. Raise to reduce false positives in cluttered scenes. Updated live — no restart required.                   |
+| `minAcceptanceScore`  | `number`          | `0.5`        | Minimum Milo cosine similarity before a frame is passed to the confirmation bucket `[0–1]`. Updated live.                                    |
+| `consecutiveMatches`  | `number`          | `2`          | Number of consecutive matching frames required before `cardDetected` fires. Higher = more certain, slower. Updated live.                     |
+| `cooldownMs`          | `number`          | `3500`       | Cooldown (ms) before the same card can fire `cardDetected` again. Updated live.                                                              |
+| `groupBySecondaryId`  | `boolean`         | `true`       | When `true`, alternate printings of the same card (same oracle/secondary ID) are grouped together for the confirmation streak. Updated live. |
+| `scanIntervalMs`      | `number`          | `900`        | Interval between frame captures (ms). Minimum `100` recommended. Updated live.                                                               |
+| `playSounds`          | `boolean`         | `true`       | Enable synthesized audio feedback.                                                                                                           |
+| `confidentSoundUrl`   | `string \| null`  | `null`       | WAV (or any Web Audio–decodable format) for a confident detection. `null` → synthesized two-note chime.                                      |
+| `uncertainSoundUrl`   | `string \| null`  | `null`       | Sound for a low-confidence detection. `null` → synthesized blip.                                                                             |
 
 `CardScannerGame`:
 
@@ -207,38 +207,38 @@ type CardScannerGame = 'magic' | 'pokemon' | 'lorcana' | 'onepiece';
 
 ### Outputs
 
-| Output | Payload | When |
-|---|---|---|
-| `cardDetected` | `CardDetection` | Every confirmed detection (after streak + cooldown). |
-| `scannerClosed` | `void` | When `close()` is called, or when the component is destroyed while the scanner is active. |
+| Output          | Payload         | When                                                                                      |
+| --------------- | --------------- | ----------------------------------------------------------------------------------------- |
+| `cardDetected`  | `CardDetection` | Every confirmed detection (after streak + cooldown).                                      |
+| `scannerClosed` | `void`          | When `close()` is called, or when the component is destroyed while the scanner is active. |
 
 ### Public signals (read-only)
 
-| Signal | Type | Description |
-|---|---|---|
-| `status` | `ScannerStatus` | Current lifecycle state (see below). |
-| `downloadProgress` | `number` | Download progress `[0–100]` during the `'downloading'` phase. |
-| `errorMessage` | `string` | Human-readable error message when `status() === 'error'`. |
-| `cornerConfidence` | `number` | Latest Cornelius confidence value from the worker (updated every frame). |
-| `viewfinderFlash` | `'confident' \| 'uncertain' \| null` | Active viewfinder ring animation. |
-| `isScanning` | `computed` | `true` when `status() === 'scanning'`. |
+| Signal             | Type                                 | Description                                                              |
+| ------------------ | ------------------------------------ | ------------------------------------------------------------------------ |
+| `status`           | `ScannerStatus`                      | Current lifecycle state (see below).                                     |
+| `downloadProgress` | `number`                             | Download progress `[0–100]` during the `'downloading'` phase.            |
+| `errorMessage`     | `string`                             | Human-readable error message when `status() === 'error'`.                |
+| `cornerConfidence` | `number`                             | Latest Cornelius confidence value from the worker (updated every frame). |
+| `viewfinderFlash`  | `'confident' \| 'uncertain' \| null` | Active viewfinder ring animation.                                        |
+| `isScanning`       | `computed`                           | `true` when `status() === 'scanning'`.                                   |
 
 ### Methods
 
-| Method | Description |
-|---|---|
-| `openScanner()` | Start (or restart) the scanner. Called automatically on mount. |
-| `close()` | Stop camera and worker, set status to `'idle'`, emit `scannerClosed`. |
+| Method          | Description                                                           |
+| --------------- | --------------------------------------------------------------------- |
+| `openScanner()` | Start (or restart) the scanner. Called automatically on mount.        |
+| `close()`       | Stop camera and worker, set status to `'idle'`, emit `scannerClosed`. |
 
 ### `ScannerStatus`
 
 ```ts
 type ScannerStatus =
-  | 'idle'                   // Not started, or after close()
-  | 'requesting-permission'  // Waiting for the browser camera permission prompt
-  | 'downloading'            // Fetching models + catalog (shows download progress)
-  | 'scanning'               // Live — will emit cardDetected
-  | 'error';                 // Unrecoverable. Read errorMessage(). Call openScanner() to retry.
+  | 'idle' // Not started, or after close()
+  | 'requesting-permission' // Waiting for the browser camera permission prompt
+  | 'downloading' // Fetching models + catalog (shows download progress)
+  | 'scanning' // Live — will emit cardDetected
+  | 'error'; // Unrecoverable. Read errorMessage(). Call openScanner() to retry.
 ```
 
 ### `CardDetection`
@@ -290,7 +290,8 @@ The component renders only the raw viewfinder (video + canvas overlay). Status t
 Use `viewfinderFlash` (read via a template reference) to apply your own animation:
 
 ```html
-<div class="scanner-wrap"
+<div
+  class="scanner-wrap"
   [class.flash-confident]="scanner.viewfinderFlash() === 'confident'"
   [class.flash-uncertain]="scanner.viewfinderFlash() === 'uncertain'"
 >
@@ -300,16 +301,30 @@ Use `viewfinderFlash` (read via a template reference) to apply your own animatio
 
 ```css
 @keyframes ring-confident {
-  0%   { box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.9); }
-  100% { box-shadow: 0 0 0 4px rgba(34, 197, 94, 0); }
+  0% {
+    box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.9);
+  }
+  100% {
+    box-shadow: 0 0 0 4px rgba(34, 197, 94, 0);
+  }
 }
 @keyframes ring-uncertain {
-  0%   { box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.9); }
-  100% { box-shadow: 0 0 0 4px rgba(245, 158, 11, 0); }
+  0% {
+    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.9);
+  }
+  100% {
+    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0);
+  }
 }
-.scanner-wrap { border-radius: 12px; }
-.flash-confident { animation: ring-confident 0.9s ease-out forwards; }
-.flash-uncertain { animation: ring-uncertain 0.9s ease-out forwards; }
+.scanner-wrap {
+  border-radius: 12px;
+}
+.flash-confident {
+  animation: ring-confident 0.9s ease-out forwards;
+}
+.flash-uncertain {
+  animation: ring-uncertain 0.9s ease-out forwards;
+}
 ```
 
 ---
@@ -339,41 +354,37 @@ For Magic cards scanned with the `tcgplayer-mtg` catalog, `cardId` is a TCGplaye
 
 ```ts
 fetch(`https://api.scryfall.com/cards/tcgplayer/${detection.cardId}`)
-  .then(r => r.json())
-  .then(card => console.log(card.name, card.image_uris?.small));
+  .then((r) => r.json())
+  .then((card) => console.log(card.name, card.image_uris?.small));
 ```
 
 For the `scryfall-mtg` catalog, `cardId` is directly a Scryfall UUID:
 
 ```ts
 fetch(`https://api.scryfall.com/cards/${detection.cardId}`)
-  .then(r => r.json())
-  .then(card => console.log(card.name));
+  .then((r) => r.json())
+  .then((card) => console.log(card.name));
 ```
 
 ### Handling the `needsReview` flag
 
 ```html
 @if (detection.needsReview) {
-  <span class="warning">Low confidence — please verify this card visually.</span>
+<span class="warning">Low confidence — please verify this card visually.</span>
 }
 ```
 
 ### Showing the scanner status
 
 ```html
-@switch (scanner.status()) {
-  @case ('requesting-permission') {
-    <p>Please allow camera access in your browser.</p>
-  }
-  @case ('downloading') {
-    <p>Loading… {{ scanner.downloadProgress() }}%</p>
-  }
-  @case ('error') {
-    <p class="error">{{ scanner.errorMessage() }}</p>
-    <button (click)="scanner.openScanner()">Retry</button>
-  }
-}
+@switch (scanner.status()) { @case ('requesting-permission') {
+<p>Please allow camera access in your browser.</p>
+} @case ('downloading') {
+<p>Loading… {{ scanner.downloadProgress() }}%</p>
+} @case ('error') {
+<p class="error">{{ scanner.errorMessage() }}</p>
+<button (click)="scanner.openScanner()">Retry</button>
+} }
 ```
 
 Where `scanner` is a `viewChild(CardScannerComponent)` reference.
@@ -389,9 +400,7 @@ If you serve CollectorVision assets from a CDN rather than the same origin:
 ```ts
 import { CV_ASSET_BASE_PATH } from '@cybey/ng-collector-vision';
 
-providers: [
-  { provide: CV_ASSET_BASE_PATH, useValue: 'https://cdn.example.com/cv' }
-]
+providers: [{ provide: CV_ASSET_BASE_PATH, useValue: 'https://cdn.example.com/cv' }];
 ```
 
 The worker, vendor files, and manifest are all resolved relative to this path.
@@ -471,6 +480,7 @@ All tuning parameters update live without restarting the worker or camera:
 ## Browser support
 
 Requires:
+
 - `getUserMedia` (camera access)
 - Web Workers with ES modules
 - `createImageBitmap`

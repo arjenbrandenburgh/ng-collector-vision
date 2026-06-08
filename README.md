@@ -59,9 +59,9 @@ Add this to your `<head>` **before** the Angular bootstrap script:
 ```html
 <script>
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/coi-serviceworker.js').then(reg => {
+    navigator.serviceWorker.register('/coi-serviceworker.js').then((reg) => {
       if (reg.installing) {
-        reg.installing.addEventListener('statechange', e => {
+        reg.installing.addEventListener('statechange', (e) => {
           if (e.target.state === 'activated') location.reload();
         });
       }
@@ -99,12 +99,12 @@ Supported game keys: `magic`, `pokemon`, `lorcana`, `onepiece`.
 
 Available `huggingface_key` values (from [HanClinto/milo](https://huggingface.co/HanClinto/milo)):
 
-| Key | Game | Card IDs |
-|---|---|---|
-| `tcgplayer-mtg` | Magic: The Gathering | TCGplayer integer IDs |
-| `tcgplayer-pokemon` | Pokémon | TCGplayer integer IDs |
-| `tcgplayer-lorcana` | Lorcana | TCGplayer integer IDs |
-| `tcgplayer-onepiece` | One Piece | TCGplayer integer IDs |
+| Key                  | Game                 | Card IDs              |
+| -------------------- | -------------------- | --------------------- |
+| `tcgplayer-mtg`      | Magic: The Gathering | TCGplayer integer IDs |
+| `tcgplayer-pokemon`  | Pokémon              | TCGplayer integer IDs |
+| `tcgplayer-lorcana`  | Lorcana              | TCGplayer integer IDs |
+| `tcgplayer-onepiece` | One Piece            | TCGplayer integer IDs |
 
 > Models and catalogs are downloaded once and cached in IndexedDB — subsequent loads are instant and work offline.
 
@@ -126,10 +126,7 @@ export const appConfig: ApplicationConfig = {
 ## Usage
 
 ```html
-<cv-card-scanner
-  game="magic"
-  (cardDetected)="onCard($event)"
-/>
+<cv-card-scanner game="magic" (cardDetected)="onCard($event)" />
 ```
 
 ```ts
@@ -148,47 +145,47 @@ export class MyComponent {
 
 ### Inputs
 
-| Input | Type | Default | Description |
-|---|---|---|---|
-| `game` | `CardScannerGame` | **required** | Active game family. Changing this restarts the scanner. |
-| `minCornerConfidence` | `number` | `0.02` | Corner-detector gate threshold `[0–1]`. Lower = more sensitive. Applied live without restart. |
-| `minAcceptanceScore` | `number` | `0.5` | Minimum embedding similarity to pass a frame to the confirmation bucket `[0–1]`. Applied live. |
-| `consecutiveMatches` | `number` | `2` | Consecutive matching frames needed before emitting `cardDetected`. Applied live. |
-| `cooldownMs` | `number` | `3500` | Cooldown (ms) before the same card can be detected again. Applied live. |
-| `groupBySecondaryId` | `boolean` | `true` | Group alternate printings of the same card by oracle/secondary ID. Applied live. |
-| `scanIntervalMs` | `number` | `900` | Interval between frame captures (ms). Minimum `100`. Applied live. |
-| `playSounds` | `boolean` | `true` | Enable audio feedback. Set `false` for silent mode. |
-| `confidentSoundUrl` | `string \| null` | `null` | WAV URL for confident-scan sound. `null` → synthesized chime. |
-| `uncertainSoundUrl` | `string \| null` | `null` | WAV URL for uncertain-scan sound. `null` → synthesized blip. |
+| Input                 | Type              | Default      | Description                                                                                    |
+| --------------------- | ----------------- | ------------ | ---------------------------------------------------------------------------------------------- |
+| `game`                | `CardScannerGame` | **required** | Active game family. Changing this restarts the scanner.                                        |
+| `minCornerConfidence` | `number`          | `0.02`       | Corner-detector gate threshold `[0–1]`. Lower = more sensitive. Applied live without restart.  |
+| `minAcceptanceScore`  | `number`          | `0.5`        | Minimum embedding similarity to pass a frame to the confirmation bucket `[0–1]`. Applied live. |
+| `consecutiveMatches`  | `number`          | `2`          | Consecutive matching frames needed before emitting `cardDetected`. Applied live.               |
+| `cooldownMs`          | `number`          | `3500`       | Cooldown (ms) before the same card can be detected again. Applied live.                        |
+| `groupBySecondaryId`  | `boolean`         | `true`       | Group alternate printings of the same card by oracle/secondary ID. Applied live.               |
+| `scanIntervalMs`      | `number`          | `900`        | Interval between frame captures (ms). Minimum `100`. Applied live.                             |
+| `playSounds`          | `boolean`         | `true`       | Enable audio feedback. Set `false` for silent mode.                                            |
+| `confidentSoundUrl`   | `string \| null`  | `null`       | WAV URL for confident-scan sound. `null` → synthesized chime.                                  |
+| `uncertainSoundUrl`   | `string \| null`  | `null`       | WAV URL for uncertain-scan sound. `null` → synthesized blip.                                   |
 
 ### Outputs
 
-| Output | Payload | Description |
-|---|---|---|
-| `cardDetected` | `CardDetection` | Fired on every confirmed detection (after consecutive-match streak + cooldown). |
-| `scannerClosed` | `void` | Fired when `close()` is called, or when the component is destroyed while the scanner is active. |
+| Output          | Payload         | Description                                                                                     |
+| --------------- | --------------- | ----------------------------------------------------------------------------------------------- |
+| `cardDetected`  | `CardDetection` | Fired on every confirmed detection (after consecutive-match streak + cooldown).                 |
+| `scannerClosed` | `void`          | Fired when `close()` is called, or when the component is destroyed while the scanner is active. |
 
 ### Methods
 
-| Method | Description |
-|---|---|
-| `close()` | Stop the scanner, release camera + worker, emit `scannerClosed`. |
-| `openScanner()` | Re-open after an error or explicit `close()`. |
+| Method          | Description                                                      |
+| --------------- | ---------------------------------------------------------------- |
+| `close()`       | Stop the scanner, release camera + worker, emit `scannerClosed`. |
+| `openScanner()` | Re-open after an error or explicit `close()`.                    |
 
 ### `CardDetection`
 
 ```ts
 interface CardDetection {
-  cardId: string;                             // Raw ID from the CollectorVision catalog
-  secondaryId: string | null;                 // Oracle ID or other secondary identifier
-  secondaryIdField: string | null;            // Name of the secondary ID field, e.g. "oracleId"
-  score: number;                              // Cosine similarity [0, 1]
-  confidence: number;                         // Corner-detector confidence
-  corners: [number, number][];                // Normalized corner coordinates
+  cardId: string; // Raw ID from the CollectorVision catalog
+  secondaryId: string | null; // Oracle ID or other secondary identifier
+  secondaryIdField: string | null; // Name of the secondary ID field, e.g. "oracleId"
+  score: number; // Cosine similarity [0, 1]
+  confidence: number; // Corner-detector confidence
+  corners: [number, number][]; // Normalized corner coordinates
   sharpness: number | null;
   orientation: 'upright' | 'rotated_180' | null;
-  needsReview: boolean;                       // score < 0.8 — consumer should flag for verification
-  detectedAt: string;                         // ISO 8601 timestamp
+  needsReview: boolean; // score < 0.8 — consumer should flag for verification
+  detectedAt: string; // ISO 8601 timestamp
 }
 ```
 
@@ -198,11 +195,11 @@ The `status` signal on the component exposes the scanner's current lifecycle sta
 
 ```ts
 type ScannerStatus =
-  | 'idle'                   // not started or after close()
-  | 'requesting-permission'  // waiting for getUserMedia permission
-  | 'downloading'            // fetching models + catalog
-  | 'scanning'               // live, emitting cardDetected
-  | 'error';                 // unrecoverable — call openScanner() to retry
+  | 'idle' // not started or after close()
+  | 'requesting-permission' // waiting for getUserMedia permission
+  | 'downloading' // fetching models + catalog
+  | 'scanning' // live, emitting cardDetected
+  | 'error'; // unrecoverable — call openScanner() to retry
 ```
 
 ### Asset base path
@@ -212,9 +209,7 @@ Override the default `/collectorvision` base if you serve assets from a CDN:
 ```ts
 import { CV_ASSET_BASE_PATH } from 'ng-collector-vision';
 
-providers: [
-  { provide: CV_ASSET_BASE_PATH, useValue: 'https://cdn.example.com/cv' }
-]
+providers: [{ provide: CV_ASSET_BASE_PATH, useValue: 'https://cdn.example.com/cv' }];
 ```
 
 ---

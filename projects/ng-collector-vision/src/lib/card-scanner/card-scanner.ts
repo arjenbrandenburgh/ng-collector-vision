@@ -91,21 +91,21 @@ export class CardScannerComponent {
   // ── Outputs ───────────────────────────────────────────────────────────────
 
   /** Emitted for every confirmed detection (after consecutive-match streak + cooldown). */
-  readonly cardDetected  = output<CardDetection>();
+  readonly cardDetected = output<CardDetection>();
   /** Emitted when `close()` is called programmatically. */
   readonly scannerClosed = output<void>();
 
   // ── Services ──────────────────────────────────────────────────────────────
 
-  readonly #assetBase  = inject(CV_ASSET_BASE_PATH);
+  readonly #assetBase = inject(CV_ASSET_BASE_PATH);
 
   // ── Signals ───────────────────────────────────────────────────────────────
 
-  readonly status           = signal<ScannerStatus>('idle');
+  readonly status = signal<ScannerStatus>('idle');
   readonly downloadProgress = signal<number>(0);
-  readonly errorMessage     = signal<string>('');
+  readonly errorMessage = signal<string>('');
   readonly a11yAnnouncement = signal<string>('');
-  readonly viewfinderFlash  = signal<'confident' | 'uncertain' | null>(null);
+  readonly viewfinderFlash = signal<'confident' | 'uncertain' | null>(null);
   /** Latest corner-detector confidence value from the worker (updated every frame). */
   readonly cornerConfidence = signal<number>(0);
 
@@ -113,7 +113,7 @@ export class CardScannerComponent {
 
   // ── View refs ─────────────────────────────────────────────────────────────
 
-  private readonly videoEl       = viewChild<ElementRef<HTMLVideoElement>>('videoEl');
+  private readonly videoEl = viewChild<ElementRef<HTMLVideoElement>>('videoEl');
   private readonly overlayCanvas = viewChild<ElementRef<HTMLCanvasElement>>('overlayCanvas');
 
   // ── Pipeline state ────────────────────────────────────────────────────────
@@ -125,14 +125,14 @@ export class CardScannerComponent {
   #worker: Worker | null = null;
   #stream: MediaStream | null = null;
   #abortCtrl: AbortController | null = null;
-  #scanTimer:    ReturnType<typeof setInterval> | null = null;
+  #scanTimer: ReturnType<typeof setInterval> | null = null;
   #previewFrame: number | null = null;
-  #workerReady   = false;
-  #workerBusy    = false;
-  #lastResult:   WorkerResultMsg | null = null;
-  #bucket        = new ConfirmationBucket(CONSECUTIVE_MATCHES, COOLDOWN_MS, true);
-  #audioCtx:     AudioContext | null = null;
-  #audioBuffers  = new Map<'confident' | 'uncertain', AudioBuffer>();
+  #workerReady = false;
+  #workerBusy = false;
+  #lastResult: WorkerResultMsg | null = null;
+  #bucket = new ConfirmationBucket(CONSECUTIVE_MATCHES, COOLDOWN_MS, true);
+  #audioCtx: AudioContext | null = null;
+  #audioBuffers = new Map<'confident' | 'uncertain', AudioBuffer>();
 
   #closed = false;
 
@@ -149,7 +149,7 @@ export class CardScannerComponent {
     // DOM setup + initial startup — deferred to avoid SSR crash.
     afterNextRender(() => {
       this.#captureCanvas = document.createElement('canvas');
-      this.#captureCtx    = this.#captureCanvas.getContext('2d')!;
+      this.#captureCtx = this.#captureCanvas.getContext('2d')!;
       void this.openScanner();
     });
 
@@ -228,7 +228,10 @@ export class CardScannerComponent {
         audio: false,
       });
       const video = this.videoEl()?.nativeElement;
-      if (video) { video.srcObject = this.#stream; await video.play(); }
+      if (video) {
+        video.srcObject = this.#stream;
+        await video.play();
+      }
       if (this.playSounds()) {
         this.#audioCtx = new AudioContext();
         void this.#preloadSounds();
@@ -247,9 +250,9 @@ export class CardScannerComponent {
         this.#setError(e.message || 'Scanner worker error.'),
       );
       this.#worker.postMessage({
-        type:               'init',
+        type: 'init',
         manifest,
-        enableWebGpu:       false,
+        enableWebGpu: false,
         minCornerConfidence: this.minCornerConfidence(),
       });
     } catch {
@@ -291,8 +294,13 @@ export class CardScannerComponent {
   }
 
   #handleFrameResult(result: WorkerResultMsg): void {
-    if (!result.cardPresent || !result.cornersValid || !result.cardId ||
-        !Number.isFinite(result.score) || result.score! < this.minAcceptanceScore()) {
+    if (
+      !result.cardPresent ||
+      !result.cornersValid ||
+      !result.cardId ||
+      !Number.isFinite(result.score) ||
+      result.score! < this.minAcceptanceScore()
+    ) {
       this.#bucket.push(null);
       return;
     }
@@ -303,16 +311,16 @@ export class CardScannerComponent {
   #emit(confirmed: ConfirmedResult): void {
     const needsReview = confirmed.score < REVIEW_THRESHOLD;
     const detection: CardDetection = {
-      cardId:           confirmed.cardId,
-      secondaryId:      confirmed.secondaryId      ?? null,
+      cardId: confirmed.cardId,
+      secondaryId: confirmed.secondaryId ?? null,
       secondaryIdField: confirmed.secondaryIdField ?? null,
-      score:            confirmed.score,
-      confidence:       confirmed.confidence,
-      corners:          confirmed.corners          ?? [],
-      sharpness:        confirmed.sharpness        ?? null,
-      orientation:      confirmed.orientation      ?? null,
+      score: confirmed.score,
+      confidence: confirmed.confidence,
+      corners: confirmed.corners ?? [],
+      sharpness: confirmed.sharpness ?? null,
+      orientation: confirmed.orientation ?? null,
       needsReview,
-      detectedAt:       new Date().toISOString(),
+      detectedAt: new Date().toISOString(),
     };
     const label = needsReview ? 'low confidence — please verify' : 'detected';
     this.a11yAnnouncement.set(`Card ${label}: ${confirmed.cardId}`);
@@ -340,7 +348,8 @@ export class CardScannerComponent {
 
   #drawCaptureFrame(): boolean {
     const video = this.videoEl()?.nativeElement;
-    if (!video?.videoWidth || !this.#stream || !this.#captureCanvas || !this.#captureCtx) return false;
+    if (!video?.videoWidth || !this.#stream || !this.#captureCanvas || !this.#captureCtx)
+      return false;
     this.#resizeCanvases(video);
     this.#captureCtx.drawImage(video, 0, 0, this.#captureCanvas.width, this.#captureCanvas.height);
     return true;
@@ -358,7 +367,7 @@ export class CardScannerComponent {
 
   #drawOverlay(result: WorkerResultMsg | null): void {
     const canvas = this.overlayCanvas()?.nativeElement;
-    const video  = this.videoEl()?.nativeElement;
+    const video = this.videoEl()?.nativeElement;
     if (!canvas || !video?.videoWidth) return;
 
     this.#resizeCanvases(video);
@@ -370,7 +379,7 @@ export class CardScannerComponent {
 
     const { width, height } = canvas;
     ctx.save();
-    ctx.lineWidth   = Math.max(3, width * 0.004);
+    ctx.lineWidth = Math.max(3, width * 0.004);
     ctx.strokeStyle = CORNER_OVERLAY_COLOUR;
     ctx.beginPath();
     result.corners.forEach(([x, y], i) => {
@@ -387,11 +396,15 @@ export class CardScannerComponent {
     const { videoWidth: w, videoHeight: h } = video;
     const overlay = this.overlayCanvas()?.nativeElement;
     if (overlay && (overlay.width !== w || overlay.height !== h)) {
-      overlay.width = w; overlay.height = h;
+      overlay.width = w;
+      overlay.height = h;
     }
-    if (this.#captureCanvas &&
-        (this.#captureCanvas.width !== w || this.#captureCanvas.height !== h)) {
-      this.#captureCanvas.width = w; this.#captureCanvas.height = h;
+    if (
+      this.#captureCanvas &&
+      (this.#captureCanvas.width !== w || this.#captureCanvas.height !== h)
+    ) {
+      this.#captureCanvas.width = w;
+      this.#captureCanvas.height = h;
     }
   }
 
@@ -400,7 +413,9 @@ export class CardScannerComponent {
   #flash(confident: boolean): void {
     const kind = confident ? 'confident' : 'uncertain';
     this.viewfinderFlash.set(kind);
-    setTimeout(() => { if (this.viewfinderFlash() === kind) this.viewfinderFlash.set(null); }, 900);
+    setTimeout(() => {
+      if (this.viewfinderFlash() === kind) this.viewfinderFlash.set(null);
+    }, 900);
     this.#playPing(confident);
   }
 
@@ -415,8 +430,8 @@ export class CardScannerComponent {
       pairs
         .filter((p): p is [string, string] => p[1] !== null)
         .map(async ([key, url]) => {
-          const res    = await fetch(url);
-          const raw    = await res.arrayBuffer();
+          const res = await fetch(url);
+          const raw = await res.arrayBuffer();
           // Guard: if teardown ran while we were fetching, ctx is no longer current.
           if (this.#audioCtx !== ctx) return;
           const buffer = await ctx.decodeAudioData(raw);
@@ -429,7 +444,9 @@ export class CardScannerComponent {
   #playPing(confident: boolean): void {
     if (!this.playSounds() || !this.#audioCtx) return;
     const ctx = this.#audioCtx;
-    if (ctx.state === 'suspended') { void ctx.resume(); }
+    if (ctx.state === 'suspended') {
+      void ctx.resume();
+    }
 
     const buffer = this.#audioBuffers.get(confident ? 'confident' : 'uncertain');
     if (buffer) {
@@ -444,10 +461,13 @@ export class CardScannerComponent {
     }
 
     if (confident) {
-      for (const [i, freq] of [[0, 880], [1, 1175]] as [number, number][]) {
-        const osc  = ctx.createOscillator();
+      for (const [i, freq] of [
+        [0, 880],
+        [1, 1175],
+      ] as [number, number][]) {
+        const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        osc.type            = 'sine';
+        osc.type = 'sine';
         osc.frequency.value = freq;
         const t = ctx.currentTime + i * 0.08;
         gain.gain.setValueAtTime(0, t);
@@ -459,9 +479,9 @@ export class CardScannerComponent {
         osc.stop(t + 0.28);
       }
     } else {
-      const osc  = ctx.createOscillator();
+      const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.type            = 'sine';
+      osc.type = 'sine';
       osc.frequency.value = 660;
       const t = ctx.currentTime;
       gain.gain.setValueAtTime(0, t);
@@ -479,15 +499,21 @@ export class CardScannerComponent {
   #teardown(): void {
     this.#abortCtrl?.abort();
     this.#abortCtrl = null;
-    if (this.#scanTimer   !== null) { clearInterval(this.#scanTimer);           this.#scanTimer   = null; }
-    if (this.#previewFrame !== null) { cancelAnimationFrame(this.#previewFrame); this.#previewFrame = null; }
+    if (this.#scanTimer !== null) {
+      clearInterval(this.#scanTimer);
+      this.#scanTimer = null;
+    }
+    if (this.#previewFrame !== null) {
+      cancelAnimationFrame(this.#previewFrame);
+      this.#previewFrame = null;
+    }
     this.#worker?.terminate();
     this.#worker = null;
-    this.#stream?.getTracks().forEach(t => t.stop());
+    this.#stream?.getTracks().forEach((t) => t.stop());
     this.#stream = null;
     this.#workerReady = false;
-    this.#workerBusy  = false;
-    this.#lastResult  = null;
+    this.#workerBusy = false;
+    this.#lastResult = null;
     this.cornerConfidence.set(0);
     this.viewfinderFlash.set(null);
     void this.#audioCtx?.close();

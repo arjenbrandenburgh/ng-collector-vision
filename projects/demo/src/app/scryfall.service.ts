@@ -15,7 +15,11 @@ export interface ScryfallCard {
 }
 
 const NULL_CARD: ScryfallCard = {
-  id: '', name: '', set: '', set_name: '', collector_number: '',
+  id: '',
+  name: '',
+  set: '',
+  set_name: '',
+  collector_number: '',
 };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -27,7 +31,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  */
 @Injectable({ providedIn: 'root' })
 export class ScryfallService {
-  readonly #http  = inject(HttpClient);
+  readonly #http = inject(HttpClient);
   readonly #cache = new Map<string, ScryfallCard>();
 
   lookup(cardId: string): Observable<ScryfallCard> {
@@ -39,17 +43,13 @@ export class ScryfallService {
       : `https://api.scryfall.com/cards/tcgplayer/${cardId}`;
 
     return this.#http.get<ScryfallCard>(url).pipe(
-      tap(card => this.#cache.set(cardId, card)),
+      tap((card) => this.#cache.set(cardId, card)),
       catchError(() => of(NULL_CARD)),
     );
   }
 
   /** Convenience: small thumbnail URL from a ScryfallCard. */
   static thumbnail(card: ScryfallCard): string | null {
-    return (
-      card.image_uris?.small ??
-      card.card_faces?.[0]?.image_uris?.small ??
-      null
-    );
+    return card.image_uris?.small ?? card.card_faces?.[0]?.image_uris?.small ?? null;
   }
 }

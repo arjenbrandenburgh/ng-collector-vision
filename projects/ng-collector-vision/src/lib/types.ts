@@ -82,9 +82,4 @@ export interface CardDetection {
 }
 
 /** Lifecycle states of the scanner. */
-export type ScannerStatus =
-  | 'idle'
-  | 'requesting-permission'
-  | 'downloading'
-  | 'scanning'
-  | 'error';
+export type ScannerStatus = 'idle' | 'requesting-permission' | 'downloading' | 'scanning' | 'error';

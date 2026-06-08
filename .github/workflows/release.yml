@@ -6,8 +6,8 @@ on:
       - 'v*.*.*'
 
 permissions:
-  contents: write   # create GitHub release
-  id-token: write   # npm provenance
+  contents: write # create GitHub release
+  id-token: write # npm provenance
 
 jobs:
   release:

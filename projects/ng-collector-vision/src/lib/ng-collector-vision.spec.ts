@@ -84,14 +84,14 @@ describe('ConfirmationBucket', () => {
       // Null frame decrements by 1 → count: 2→1.
       bucket.push(null);
       // Only 2 more frames needed (1→2, 2→3=confirm), not 3.
-      expect(bucket.push(makeResult('card-a', 0.9))).toBeNull();      // count: 1→2
-      expect(bucket.push(makeResult('card-a', 0.9))).not.toBeNull();  // count: 2→3 → confirms
+      expect(bucket.push(makeResult('card-a', 0.9))).toBeNull(); // count: 1→2
+      expect(bucket.push(makeResult('card-a', 0.9))).not.toBeNull(); // count: 2→3 → confirms
     });
 
     it('fully clears the candidate when null frames decay the count to 0', () => {
       const bucket = new ConfirmationBucket(3, 0, false);
       bucket.push(makeResult('card-a', 0.9)); // count: 0→1
-      bucket.push(null);                       // count: 1→0 → candidate nulled
+      bucket.push(null); // count: 1→0 → candidate nulled
       // Candidate is gone; a new streak starts from scratch.
       expect(bucket.push(makeResult('card-a', 0.9))).toBeNull(); // count: 0→1
       expect(bucket.push(makeResult('card-a', 0.9))).toBeNull(); // count: 1→2
@@ -124,7 +124,7 @@ describe('ConfirmationBucket', () => {
       expect(bucket.push({ ...makeResult('card-a', 0.9), score: undefined })).toBeNull();
     });
 
-    it('accepts score = 0 (boundary — filtering is the component\'s job)', () => {
+    it("accepts score = 0 (boundary — filtering is the component's job)", () => {
       const bucket = new ConfirmationBucket(1, 0, false);
       const result = bucket.push(makeResult('card-a', 0));
       expect(result).not.toBeNull();
@@ -135,9 +135,9 @@ describe('ConfirmationBucket', () => {
   describe('bestScore tracking', () => {
     it('keeps the result with the highest score in the streak', () => {
       const bucket = new ConfirmationBucket(3, 0, false);
-      const low  = makeResult('card-a', 0.7);
+      const low = makeResult('card-a', 0.7);
       const high = makeResult('card-a', 0.95);
-      const mid  = makeResult('card-a', 0.8);
+      const mid = makeResult('card-a', 0.8);
       bucket.push(low);
       bucket.push(high);
       const confirmed = bucket.push(mid);
@@ -172,7 +172,7 @@ describe('ConfirmationBucket', () => {
       expect(result).not.toBeNull();
     });
 
-    it('does not block a different card during another card\'s cooldown', () => {
+    it("does not block a different card during another card's cooldown", () => {
       const bucket = new ConfirmationBucket(1, 1000, false);
       bucket.push(makeResult('card-a', 0.9));
       const result = bucket.push(makeResult('card-b', 0.9));
@@ -345,7 +345,7 @@ describe('CardScannerComponent', () => {
 
 describe('constants', () => {
   it('GAME_OPTIONS covers all four supported games', () => {
-    const values = GAME_OPTIONS.map(o => o.value);
+    const values = GAME_OPTIONS.map((o) => o.value);
     expect(values).toContain('magic');
     expect(values).toContain('pokemon');
     expect(values).toContain('lorcana');

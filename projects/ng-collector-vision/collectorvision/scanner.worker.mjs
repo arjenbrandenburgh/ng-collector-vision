@@ -17,7 +17,7 @@
 //                       detectorBitmap?, cropBitmap? }
 //   { type: 'error',    message }
 
-import * as ort from "https://vision.hippolink.app/vendor/onnxruntime-web/ort.webgpu.min.mjs";
+import * as ort from 'https://vision.hippolink.app/vendor/onnxruntime-web/ort.webgpu.min.mjs';
 
 // ---------------------------------------------------------------------------
 // HippoLink patch: all CollectorVision assets (models, catalogs, vendor files)
@@ -25,7 +25,7 @@ import * as ort from "https://vision.hippolink.app/vendor/onnxruntime-web/ort.we
 // it can be bundled with the Angular app, but every fetch it makes points to
 // the remote host. Absolute https:// paths are passed through unchanged.
 // ---------------------------------------------------------------------------
-const CV_BASE = "https://vision.hippolink.app";
+const CV_BASE = 'https://vision.hippolink.app';
 
 function assetUrl(path) {
   if (!path) return path;
@@ -44,8 +44,8 @@ const DEFAULT_MIN_CORNER_CONFIDENCE = 0.02;
 const IMAGENET_MEAN = [0.485, 0.456, 0.406];
 const IMAGENET_STD = [0.229, 0.224, 0.225];
 
-const ASSET_DB_NAME = "collectorvision-web-scanner";
-const ASSET_STORE_NAME = "assets";
+const ASSET_DB_NAME = 'collectorvision-web-scanner';
+const ASSET_STORE_NAME = 'assets';
 
 // ---------------------------------------------------------------------------
 // Math helpers (identical to the originals in app.js)
@@ -100,9 +100,7 @@ function orderCorners(points, width = null, height = null) {
     const [x2, y2] = ordered[(i + 1) % ordered.length];
     return sum + (x1 * y2 - x2 * y1);
   }, 0);
-  const canonical = signedArea < 0
-    ? [ordered[0], ordered[3], ordered[2], ordered[1]]
-    : ordered;
+  const canonical = signedArea < 0 ? [ordered[0], ordered[3], ordered[2], ordered[1]] : ordered;
   return width && height ? orientShortestEdgeTop(canonical, width, height) : canonical;
 }
 
@@ -128,7 +126,7 @@ function isUsableQuad(corners) {
     for (let j = i + 1; j < corners.length; j += 1) {
       const dx = corners[i][0] - corners[j][0];
       const dy = corners[i][1] - corners[j][1];
-      if ((dx * dx + dy * dy) < 0.0004) {
+      if (dx * dx + dy * dy < 0.0004) {
         return false;
       }
     }
@@ -144,8 +142,8 @@ function isUsableQuad(corners) {
     const prev = corners[(i + 3) % 4];
     const curr = corners[i];
     const next = corners[(i + 1) % 4];
-    const cross = (curr[0] - prev[0]) * (next[1] - curr[1])
-                - (curr[1] - prev[1]) * (next[0] - curr[0]);
+    const cross =
+      (curr[0] - prev[0]) * (next[1] - curr[1]) - (curr[1] - prev[1]) * (next[0] - curr[0]);
     if (cross > 0) pos += 1;
     if (cross < 0) neg += 1;
   }
@@ -167,7 +165,7 @@ function solveLinearSystem(matrix, vector) {
       }
     }
     if (Math.abs(a[pivot][col]) < 1e-10) {
-      throw new Error("Could not solve dewarp transform.");
+      throw new Error('Could not solve dewarp transform.');
     }
     if (pivot !== col) {
       [a[col], a[pivot]] = [a[pivot], a[col]];
@@ -258,32 +256,29 @@ function snakeToCamel(value) {
 }
 
 function secondaryCatalogKeyToFieldName(catalogKey) {
-  const key = String(catalogKey ?? "").trim();
+  const key = String(catalogKey ?? '').trim();
   if (!key) {
     return null;
   }
-  const base = key.replace(/_ids$/i, "_id");
+  const base = key.replace(/_ids$/i, '_id');
   const fieldName = snakeToCamel(base);
   return fieldName || null;
 }
 
 function resolveSecondaryIdSource(catalog = {}) {
-  const explicitPath = typeof catalog.secondary_ids === "string"
-    ? catalog.secondary_ids
-    : null;
-  const explicitField = typeof catalog.secondary_id_field === "string"
-    ? catalog.secondary_id_field
-    : null;
+  const explicitPath = typeof catalog.secondary_ids === 'string' ? catalog.secondary_ids : null;
+  const explicitField =
+    typeof catalog.secondary_id_field === 'string' ? catalog.secondary_id_field : null;
 
   if (explicitPath) {
     return {
       assetPath: explicitPath,
-      fieldName: explicitField || "secondaryId",
+      fieldName: explicitField || 'secondaryId',
     };
   }
 
   const candidates = Object.entries(catalog)
-    .filter(([key, value]) => key !== "card_ids" && /_ids$/i.test(key) && typeof value === "string")
+    .filter(([key, value]) => key !== 'card_ids' && /_ids$/i.test(key) && typeof value === 'string')
     .sort(([a], [b]) => a.localeCompare(b));
   if (candidates.length === 0) {
     return null;
@@ -292,7 +287,7 @@ function resolveSecondaryIdSource(catalog = {}) {
   const [catalogKey, assetPath] = candidates[0];
   return {
     assetPath,
-    fieldName: explicitField || secondaryCatalogKeyToFieldName(catalogKey) || "secondaryId",
+    fieldName: explicitField || secondaryCatalogKeyToFieldName(catalogKey) || 'secondaryId',
   };
 }
 
@@ -309,11 +304,11 @@ function float16ToFloat32(value) {
     if (fraction === 0) {
       return sign ? -0 : 0;
     }
-    return (sign ? -1 : 1) * 2 ** (-14) * (fraction / 1024);
+    return (sign ? -1 : 1) * 2 ** -14 * (fraction / 1024);
   }
 
   if (exponent === 0x1f) {
-    return fraction ? Number.NaN : (sign ? -Infinity : Infinity);
+    return fraction ? Number.NaN : sign ? -Infinity : Infinity;
   }
 
   return (sign ? -1 : 1) * 2 ** (exponent - 15) * (1 + fraction / 1024);
@@ -354,7 +349,7 @@ function openAssetDb() {
 async function readCachedAsset(key) {
   const db = await openAssetDb();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(ASSET_STORE_NAME, "readonly");
+    const tx = db.transaction(ASSET_STORE_NAME, 'readonly');
     const store = tx.objectStore(ASSET_STORE_NAME);
     const request = store.get(key);
     request.onsuccess = () => resolve(request.result ?? null);
@@ -365,7 +360,7 @@ async function readCachedAsset(key) {
 async function writeCachedAsset(key, value) {
   const db = await openAssetDb();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(ASSET_STORE_NAME, "readwrite");
+    const tx = db.transaction(ASSET_STORE_NAME, 'readwrite');
     const store = tx.objectStore(ASSET_STORE_NAME);
     const request = store.put(value, key);
     request.onsuccess = () => resolve();
@@ -391,12 +386,19 @@ async function writeCachedAsset(key, value) {
 
 async function decompressDeflateRaw(buffer) {
   const chunks = [];
-  const sink = new WritableStream({ write(chunk) { chunks.push(chunk); } });
+  const sink = new WritableStream({
+    write(chunk) {
+      chunks.push(chunk);
+    },
+  });
   const source = new ReadableStream({
-    start(ctrl) { ctrl.enqueue(new Uint8Array(buffer)); ctrl.close(); },
+    start(ctrl) {
+      ctrl.enqueue(new Uint8Array(buffer));
+      ctrl.close();
+    },
   });
   try {
-    await source.pipeThrough(new DecompressionStream("deflate-raw")).pipeTo(sink);
+    await source.pipeThrough(new DecompressionStream('deflate-raw')).pipeTo(sink);
   } catch (err) {
     // "Junk found after end of compressed data" (Chrome/Safari) or similar:
     // The ZIP local-file-header's compressedSz can include trailing bytes such
@@ -410,7 +412,10 @@ async function decompressDeflateRaw(buffer) {
   for (const c of chunks) size += c.length;
   const out = new Uint8Array(size);
   let off = 0;
-  for (const c of chunks) { out.set(c, off); off += c.length; }
+  for (const c of chunks) {
+    out.set(c, off);
+    off += c.length;
+  }
   return out.buffer;
 }
 
@@ -420,39 +425,44 @@ async function extractFromNpz(npzBuffer, entryName) {
   // file was written with streaming (bit 3 of general purpose flag set) and the
   // actual sizes were written in a data descriptor afterwards.
   // The Central Directory, at the end of the archive, always has correct values.
-  const view  = new DataView(npzBuffer);
+  const view = new DataView(npzBuffer);
   const bytes = new Uint8Array(npzBuffer);
 
   // Locate End-of-Central-Directory record (PK\x05\x06 = 0x06054b50).
   let eocdOffset = -1;
   for (let i = npzBuffer.byteLength - 22; i >= 0; i--) {
-    if (view.getUint32(i, true) === 0x06054b50) { eocdOffset = i; break; }
+    if (view.getUint32(i, true) === 0x06054b50) {
+      eocdOffset = i;
+      break;
+    }
   }
-  if (eocdOffset < 0) throw new Error("NPZ: End of Central Directory not found");
+  if (eocdOffset < 0) throw new Error('NPZ: End of Central Directory not found');
 
   const entryCount = view.getUint16(eocdOffset + 10, true);
-  const cdOffset   = view.getUint32(eocdOffset + 16, true);
+  const cdOffset = view.getUint32(eocdOffset + 16, true);
 
   let pos = cdOffset;
   for (let i = 0; i < entryCount; i++) {
     if (pos + 46 > npzBuffer.byteLength) break;
     if (view.getUint32(pos, true) !== 0x02014b50) break; // Central Directory sig
 
-    const comprMethod  = view.getUint16(pos + 10, true);
+    const comprMethod = view.getUint16(pos + 10, true);
     const compressedSz = view.getUint32(pos + 20, true);
-    const nameLen      = view.getUint16(pos + 28, true);
-    const extraLen     = view.getUint16(pos + 30, true);
-    const commentLen   = view.getUint16(pos + 32, true);
-    const localOffset  = view.getUint32(pos + 42, true);
-    const name         = new TextDecoder().decode(bytes.slice(pos + 46, pos + 46 + nameLen));
+    const nameLen = view.getUint16(pos + 28, true);
+    const extraLen = view.getUint16(pos + 30, true);
+    const commentLen = view.getUint16(pos + 32, true);
+    const localOffset = view.getUint32(pos + 42, true);
+    const name = new TextDecoder().decode(bytes.slice(pos + 46, pos + 46 + nameLen));
 
     if (name === entryName) {
       // Compute data start from the local file header (sizes come from the CD).
-      const lhNameLen  = view.getUint16(localOffset + 26, true);
+      const lhNameLen = view.getUint16(localOffset + 26, true);
       const lhExtraLen = view.getUint16(localOffset + 28, true);
-      const dataStart  = localOffset + 30 + lhNameLen + lhExtraLen;
+      const dataStart = localOffset + 30 + lhNameLen + lhExtraLen;
 
-      console.log(`[CV] ZIP entry "${name}": method=${comprMethod} compressedSz=${compressedSz} dataStart=${dataStart}`);
+      console.log(
+        `[CV] ZIP entry "${name}": method=${comprMethod} compressedSz=${compressedSz} dataStart=${dataStart}`,
+      );
       const raw = npzBuffer.slice(dataStart, dataStart + compressedSz);
       if (comprMethod === 0) return raw;
       if (comprMethod === 8) return decompressDeflateRaw(raw);
@@ -466,30 +476,33 @@ async function extractFromNpz(npzBuffer, entryName) {
 
 function parseNpyHeader(buffer) {
   const bytes = new Uint8Array(buffer);
-  const view  = new DataView(buffer);
-  if (bytes[0] !== 0x93 || String.fromCharCode(...bytes.slice(1, 6)) !== "NUMPY") {
-    throw new Error("Not a valid .npy file");
+  const view = new DataView(buffer);
+  if (bytes[0] !== 0x93 || String.fromCharCode(...bytes.slice(1, 6)) !== 'NUMPY') {
+    throw new Error('Not a valid .npy file');
   }
-  const major      = bytes[6];
-  const hdrLen     = major === 1 ? view.getUint16(8, true) : view.getUint32(8, true);
-  const hdrStart   = major === 1 ? 10 : 12;
-  const header     = new TextDecoder().decode(bytes.slice(hdrStart, hdrStart + hdrLen));
-  const dataStart  = hdrStart + hdrLen;
-  const dtype      = (header.match(/'descr':\s*'([^']+)'/) ?? [])[1] ?? "";
-  const shapeRaw   = (header.match(/'shape':\s*\(([^)]*)\)/) ?? [])[1] ?? "";
-  const shape      = shapeRaw.split(",").map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
+  const major = bytes[6];
+  const hdrLen = major === 1 ? view.getUint16(8, true) : view.getUint32(8, true);
+  const hdrStart = major === 1 ? 10 : 12;
+  const header = new TextDecoder().decode(bytes.slice(hdrStart, hdrStart + hdrLen));
+  const dataStart = hdrStart + hdrLen;
+  const dtype = (header.match(/'descr':\s*'([^']+)'/) ?? [])[1] ?? '';
+  const shapeRaw = (header.match(/'shape':\s*\(([^)]*)\)/) ?? [])[1] ?? '';
+  const shape = shapeRaw
+    .split(',')
+    .map((s) => parseInt(s.trim(), 10))
+    .filter((n) => !isNaN(n));
   return { dtype, shape, dataStart, buffer };
 }
 
 function npyToEmbeddings({ dtype, shape, dataStart, buffer }) {
   const [rows, dims] = shape;
 
-  if (dtype === "<f2" || dtype === "|f2") {
+  if (dtype === '<f2' || dtype === '|f2') {
     // Already float16 — slice and return as-is.
     return buffer.slice(dataStart, dataStart + rows * dims * 2);
   }
 
-  if (dtype === "<f4") {
+  if (dtype === '<f4') {
     // HuggingFace catalogs store embeddings as float32.  Convert to float16 so
     // the downstream cosine-search routine (which assumes 2 bytes/element) works
     // without modification.
@@ -501,19 +514,22 @@ function npyToEmbeddings({ dtype, shape, dataStart, buffer }) {
     const scratch = new DataView(new ArrayBuffer(4));
     for (let i = 0; i < src.length; i++) {
       scratch.setFloat32(0, src[i], true);
-      const b  = scratch.getUint32(0, true);
-      const s  = b >>> 31;
-      const e  = (b >>> 23) & 0xFF;
-      const m  = b & 0x7FFFFF;
-      if (e === 0xFF) {
-        dst[i] = (s << 15) | 0x7C00 | (m ? 0x0200 : 0); // NaN/Inf
+      const b = scratch.getUint32(0, true);
+      const s = b >>> 31;
+      const e = (b >>> 23) & 0xff;
+      const m = b & 0x7fffff;
+      if (e === 0xff) {
+        dst[i] = (s << 15) | 0x7c00 | (m ? 0x0200 : 0); // NaN/Inf
       } else if (e === 0) {
-        dst[i] = s << 15;                                  // zero/denormal
+        dst[i] = s << 15; // zero/denormal
       } else {
         const ne = e - 127 + 15;
-        dst[i] = ne >= 31 ? (s << 15) | 0x7C00            // overflow → ±Inf
-               : ne <= 0  ? s << 15                        // underflow → ±0
-               : (s << 15) | (ne << 10) | (m >>> 13);      // normal
+        dst[i] =
+          ne >= 31
+            ? (s << 15) | 0x7c00 // overflow → ±Inf
+            : ne <= 0
+              ? s << 15 // underflow → ±0
+              : (s << 15) | (ne << 10) | (m >>> 13); // normal
       }
     }
     console.log(`[CV] float32→float16 conversion done`);
@@ -525,10 +541,10 @@ function npyToEmbeddings({ dtype, shape, dataStart, buffer }) {
 
 function npyToCardIds({ dtype, shape, dataStart, buffer }) {
   const count = shape[0];
-  const ids   = [];
+  const ids = [];
   const bytes = new Uint8Array(buffer);
 
-  if (dtype.startsWith("|S")) {
+  if (dtype.startsWith('|S')) {
     // Fixed-length byte strings, null-padded — typical for ASCII IDs.
     const stride = parseInt(dtype.slice(2), 10);
     for (let i = 0; i < count; i++) {
@@ -537,16 +553,15 @@ function npyToCardIds({ dtype, shape, dataStart, buffer }) {
       while (end < base + stride && bytes[end] !== 0) end++;
       ids.push(String.fromCharCode(...bytes.subarray(base, end)));
     }
-
-  } else if (dtype.startsWith("<U")) {
+  } else if (dtype.startsWith('<U')) {
     // UTF-32 LE strings — each char is 4 bytes.
     // Fast path: card IDs (TCGplayer integers, Scryfall UUIDs) are pure ASCII.
     // In UTF-32 LE, ASCII char 'X' is stored as [X, 0, 0, 0].  Reading only
     // the first byte of each 4-byte unit avoids DataView.getUint32 overhead
     // and allows a single String.fromCharCode(...) call per card.
-    const chars  = parseInt(dtype.slice(2), 10);
+    const chars = parseInt(dtype.slice(2), 10);
     const stride = chars * 4;
-    const buf    = new Uint8Array(chars);
+    const buf = new Uint8Array(chars);
     for (let i = 0; i < count; i++) {
       const base = dataStart + i * stride;
       let len = 0;
@@ -557,23 +572,20 @@ function npyToCardIds({ dtype, shape, dataStart, buffer }) {
       }
       ids.push(String.fromCharCode(...buf.subarray(0, len)));
     }
-
-  } else if (dtype === "<i4" || dtype === ">i4") {
+  } else if (dtype === '<i4' || dtype === '>i4') {
     // 32-bit integer IDs (some TCGplayer catalogs store product IDs as int32).
-    const le   = dtype === "<i4";
+    const le = dtype === '<i4';
     const view = new DataView(buffer);
     for (let i = 0; i < count; i++) {
       ids.push(String(view.getInt32(dataStart + i * 4, le)));
     }
-
-  } else if (dtype === "<i8" || dtype === ">i8") {
+  } else if (dtype === '<i8' || dtype === '>i8') {
     // 64-bit integer IDs.
-    const le   = dtype === "<i8";
+    const le = dtype === '<i8';
     const view = new DataView(buffer);
     for (let i = 0; i < count; i++) {
       ids.push(String(view.getBigInt64(dataStart + i * 8, le)));
     }
-
   } else {
     throw new Error(`Unsupported card_ids dtype: ${dtype}`);
   }
@@ -584,14 +596,12 @@ async function resolveHuggingFaceUrl(catalogKey) {
   // List files in the catalogs/ directory of the HuggingFace repo and pick the
   // latest dated snapshot for the requested catalog key.
   // Filenames: milo1-{catalog_key}-{YYYY-MM-DD}.npz  (lexicographic = chronological)
-  const resp = await fetch(
-    "https://huggingface.co/api/models/HanClinto/milo/tree/main/catalogs",
-  );
+  const resp = await fetch('https://huggingface.co/api/models/HanClinto/milo/tree/main/catalogs');
   if (!resp.ok) throw new Error(`HuggingFace API error: ${resp.status}`);
-  const files   = await resp.json();
-  const prefix  = `catalogs/milo1-${catalogKey}-`;
+  const files = await resp.json();
+  const prefix = `catalogs/milo1-${catalogKey}-`;
   const matches = files
-    .filter(f => f.path?.startsWith(prefix) && f.path?.endsWith(".npz"))
+    .filter((f) => f.path?.startsWith(prefix) && f.path?.endsWith('.npz'))
     .sort((a, b) => b.path.localeCompare(a.path)); // newest first (YYYY-MM-DD is lexicographic)
   if (!matches.length) throw new Error(`No HuggingFace snapshot for: ${catalogKey}`);
   return `https://huggingface.co/HanClinto/milo/resolve/main/${matches[0].path}`;
@@ -600,58 +610,58 @@ async function resolveHuggingFaceUrl(catalogKey) {
 async function fetchHuggingFaceCatalog(catalogKey, onStage) {
   try {
     console.log(`[CV] Resolving HuggingFace URL for: ${catalogKey}`);
-    const npzUrl     = await resolveHuggingFaceUrl(catalogKey);
-    const snapshotId = npzUrl.split("/").pop().replace(".npz", "");
+    const npzUrl = await resolveHuggingFaceUrl(catalogKey);
+    const snapshotId = npzUrl.split('/').pop().replace('.npz', '');
     console.log(`[CV] Resolved to snapshot: ${snapshotId}`);
 
     const embedKey = `hf:${snapshotId}:embed`;
-    const idsKey   = `hf:${snapshotId}:ids`;
+    const idsKey = `hf:${snapshotId}:ids`;
 
     const cachedEmbed = await readCachedAsset(embedKey);
-    const cachedIds   = await readCachedAsset(idsKey);
+    const cachedIds = await readCachedAsset(idsKey);
     if (cachedEmbed && cachedIds) {
       console.log(`[CV] Serving ${catalogKey} from IndexedDB cache`);
-      onStage?.("catalog", 1, 1, 1, true);
+      onStage?.('catalog', 1, 1, 1, true);
       return { embeddingBuffer: cachedEmbed, ids: cachedIds };
     }
 
     console.log(`[CV] Downloading ${npzUrl}`);
-    const npzBuffer = await fetchWithProgress(npzUrl, "buffer", (ratio, loaded, total) => {
-      onStage?.("catalog", ratio * 0.85, loaded, total, false);
+    const npzBuffer = await fetchWithProgress(npzUrl, 'buffer', (ratio, loaded, total) => {
+      onStage?.('catalog', ratio * 0.85, loaded, total, false);
     });
     console.log(`[CV] NPZ downloaded: ${npzBuffer.byteLength} bytes`);
-    onStage?.("catalog", 0.85);
+    onStage?.('catalog', 0.85);
 
-    console.log("[CV] Extracting embeddings.npy from NPZ…");
-    const embedNpyBuf = await extractFromNpz(npzBuffer, "embeddings.npy");
+    console.log('[CV] Extracting embeddings.npy from NPZ…');
+    const embedNpyBuf = await extractFromNpz(npzBuffer, 'embeddings.npy');
     console.log(`[CV] embeddings.npy extracted: ${embedNpyBuf.byteLength} bytes`);
-    onStage?.("catalog", 0.88);
+    onStage?.('catalog', 0.88);
 
-    const embedNpy        = parseNpyHeader(embedNpyBuf);
+    const embedNpy = parseNpyHeader(embedNpyBuf);
     console.log(`[CV] embeddings dtype=${embedNpy.dtype} shape=${embedNpy.shape}`);
     const embeddingBuffer = npyToEmbeddings(embedNpy);
     console.log(`[CV] Embedding buffer ready: ${embeddingBuffer.byteLength} bytes`);
-    onStage?.("catalog", 0.91);
+    onStage?.('catalog', 0.91);
 
-    console.log("[CV] Extracting card_ids.npy from NPZ…");
-    const idsNpyBuf = await extractFromNpz(npzBuffer, "card_ids.npy");
+    console.log('[CV] Extracting card_ids.npy from NPZ…');
+    const idsNpyBuf = await extractFromNpz(npzBuffer, 'card_ids.npy');
     console.log(`[CV] card_ids.npy extracted: ${idsNpyBuf.byteLength} bytes`);
-    onStage?.("catalog", 0.93);
+    onStage?.('catalog', 0.93);
 
     const idsNpy = parseNpyHeader(idsNpyBuf);
     console.log(`[CV] card_ids dtype=${idsNpy.dtype} shape=${idsNpy.shape}`);
-    const ids    = npyToCardIds(idsNpy);
+    const ids = npyToCardIds(idsNpy);
     console.log(`[CV] Decoded ${ids.length} card IDs. First: ${ids[0]}`);
-    onStage?.("catalog", 0.96);
+    onStage?.('catalog', 0.96);
 
-    console.log("[CV] Writing embeddings to IndexedDB…");
+    console.log('[CV] Writing embeddings to IndexedDB…');
     await writeCachedAsset(embedKey, embeddingBuffer);
-    onStage?.("catalog", 0.98);
+    onStage?.('catalog', 0.98);
 
-    console.log("[CV] Writing card IDs to IndexedDB…");
+    console.log('[CV] Writing card IDs to IndexedDB…');
     await writeCachedAsset(idsKey, ids);
-    console.log("[CV] Catalog ready.");
-    onStage?.("catalog", 1);
+    console.log('[CV] Catalog ready.');
+    onStage?.('catalog', 1);
 
     return { embeddingBuffer, ids };
   } catch (err) {
@@ -665,14 +675,14 @@ async function fetchHuggingFaceCatalog(catalogKey, onStage) {
 // ---------------------------------------------------------------------------
 
 async function fetchWithProgress(url, responseType, onProgress) {
-  const response = await fetch(url, { cache: "no-store" });
+  const response = await fetch(url, { cache: 'no-store' });
   if (!response.ok) {
     throw new Error(`Failed to fetch ${url}: HTTP ${response.status}`);
   }
 
-  const total = Number.parseInt(response.headers.get("content-length") ?? "0", 10) || 0;
+  const total = Number.parseInt(response.headers.get('content-length') ?? '0', 10) || 0;
   if (!response.body || total === 0) {
-    const payload = responseType === "json" ? await response.json() : await response.arrayBuffer();
+    const payload = responseType === 'json' ? await response.json() : await response.arrayBuffer();
     onProgress?.(1, total || 1, total || 1);
     return payload;
   }
@@ -692,7 +702,7 @@ async function fetchWithProgress(url, responseType, onProgress) {
   }
 
   const blob = new Blob(chunks);
-  if (responseType === "json") {
+  if (responseType === 'json') {
     return JSON.parse(await blob.text());
   }
   return await blob.arrayBuffer();
@@ -705,7 +715,7 @@ async function fetchJsonCached(url, version, onProgress) {
     onProgress?.(1, 1, 1, true);
     return cached;
   }
-  const json = await fetchWithProgress(url, "json", (ratio, loaded, total) => {
+  const json = await fetchWithProgress(url, 'json', (ratio, loaded, total) => {
     onProgress?.(ratio, loaded, total, false);
   });
   await writeCachedAsset(key, json);
@@ -719,7 +729,7 @@ async function fetchBufferCached(url, version, onProgress) {
     onProgress?.(1, cached.byteLength ?? 1, cached.byteLength ?? 1, true);
     return cached;
   }
-  const buffer = await fetchWithProgress(url, "buffer", (ratio, loaded, total) => {
+  const buffer = await fetchWithProgress(url, 'buffer', (ratio, loaded, total) => {
     onProgress?.(ratio, loaded, total, false);
   });
   await writeCachedAsset(key, buffer);
@@ -736,31 +746,29 @@ async function fetchBufferCached(url, version, onProgress) {
  * Never throws — a false return means ort-web will fall back to WASM.
  */
 async function configureWebGpu() {
-  if (!("gpu" in navigator)) {
+  if (!('gpu' in navigator)) {
     return false;
   }
 
   const adapter = await navigator.gpu.requestAdapter({
-    powerPreference: "high-performance",
+    powerPreference: 'high-performance',
   });
   if (!adapter) {
     return false;
   }
 
-  const requestedStorageBuffers = Math.min(
-    10,
-    adapter.limits.maxStorageBuffersPerShaderStage ?? 8,
-  );
+  const requestedStorageBuffers = Math.min(10, adapter.limits.maxStorageBuffersPerShaderStage ?? 8);
   const originalRequestDevice = adapter.requestDevice.bind(adapter);
-  Object.defineProperty(adapter, "requestDevice", {
+  Object.defineProperty(adapter, 'requestDevice', {
     configurable: true,
-    value: async (descriptor = {}) => originalRequestDevice({
-      ...descriptor,
-      requiredLimits: {
-        ...(descriptor.requiredLimits ?? {}),
-        maxStorageBuffersPerShaderStage: requestedStorageBuffers,
-      },
-    }),
+    value: async (descriptor = {}) =>
+      originalRequestDevice({
+        ...descriptor,
+        requiredLimits: {
+          ...(descriptor.requiredLimits ?? {}),
+          maxStorageBuffersPerShaderStage: requestedStorageBuffers,
+        },
+      }),
   });
 
   ort.env.webgpu.adapter = adapter;
@@ -799,8 +807,10 @@ function createInputTensor(size) {
 }
 
 function isIOS() {
-  return /iPad|iPhone|iPod/.test(navigator.userAgent)
-    || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  return (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -820,9 +830,8 @@ class WorkerRuntime {
     this.useWebGpu = useWebGpu;
     this.rotationInvariant = rotationInvariant;
     this.minCornerConfidence = clamp01(minCornerConfidence);
-    this.catalogLimit = Number.isFinite(catalogLimit) && catalogLimit > 0
-      ? Math.floor(catalogLimit)
-      : null;
+    this.catalogLimit =
+      Number.isFinite(catalogLimit) && catalogLimit > 0 ? Math.floor(catalogLimit) : null;
     this.catalogRows = manifest.catalog?.rows ?? 0;
     this.catalogTotalRows = manifest.catalog?.rows ?? 0;
     this.detector = null;
@@ -833,15 +842,19 @@ class WorkerRuntime {
     this.secondaryIds = null;
     this.secondaryIdField = null;
     this.dewarpCanvas = new OffscreenCanvas(DEWARP_W, DEWARP_H);
-    this.dewarpCtx = this.dewarpCanvas.getContext("2d", { willReadFrequently: true });
+    this.dewarpCtx = this.dewarpCanvas.getContext('2d', { willReadFrequently: true });
     this.dewarpImageData = this.dewarpCtx.createImageData(DEWARP_W, DEWARP_H);
     // Reusable 384×384 scratch canvas — what was fed to the detector.
     // Transferred to the main thread as a debug bitmap on each result.
     this.detectorScratchCanvas = new OffscreenCanvas(DETECTOR_SIZE, DETECTOR_SIZE);
-    this.detectorScratchCtx = this.detectorScratchCanvas.getContext("2d", { willReadFrequently: true });
+    this.detectorScratchCtx = this.detectorScratchCanvas.getContext('2d', {
+      willReadFrequently: true,
+    });
     this.detectorInputTensor = createInputTensor(DETECTOR_SIZE);
     this.embedderScratchCanvas = new OffscreenCanvas(EMBEDDER_SIZE, EMBEDDER_SIZE);
-    this.embedderScratchCtx = this.embedderScratchCanvas.getContext("2d", { willReadFrequently: true });
+    this.embedderScratchCtx = this.embedderScratchCanvas.getContext('2d', {
+      willReadFrequently: true,
+    });
     this.embedderInputTensor = createInputTensor(EMBEDDER_SIZE);
     this._lastRawCorners = null;
     this._lastDetectorInput = null;
@@ -860,16 +873,16 @@ class WorkerRuntime {
     // IndexedDB entry, even if the bundle version string hasn't changed.
     const hashes = this.manifest.model_hashes ?? {};
     const detectorVersion = hashes.cornelius ?? version;
-    const embedderVersion = hashes.milo       ?? version;
+    const embedderVersion = hashes.milo ?? version;
     const detectorBuffer = await fetchBufferCached(
       assetUrl(this.manifest.models.cornelius),
       detectorVersion,
-      (ratio, loaded, total, cached) => onStage?.("detector", ratio, loaded, total, cached),
+      (ratio, loaded, total, cached) => onStage?.('detector', ratio, loaded, total, cached),
     );
     const embedderBuffer = await fetchBufferCached(
       assetUrl(this.manifest.models.milo),
       embedderVersion,
-      (ratio, loaded, total, cached) => onStage?.("embedder", ratio, loaded, total, cached),
+      (ratio, loaded, total, cached) => onStage?.('embedder', ratio, loaded, total, cached),
     );
 
     // Use as many threads as the device has cores, capped at 4.
@@ -887,7 +900,7 @@ class WorkerRuntime {
     // WebGPU is proven broken on Android ARM (issues #9 and #12) but may work
     // on iOS (Metal) and desktop.  The enableWebGpu flag in the init message
     // lets the user opt in from Settings — see ARCHITECTURE.md Lessons Learned.
-    const ep = this.useWebGpu ? "webgpu" : "wasm";
+    const ep = this.useWebGpu ? 'webgpu' : 'wasm';
     this.detector = await ort.InferenceSession.create(detectorBuffer, {
       executionProviders: [ep],
     });
@@ -907,17 +920,18 @@ class WorkerRuntime {
         (stage, ratio, loaded, total, cached) => onStage?.(stage, ratio, loaded, total, cached),
       );
       embeddingBuffer = hf.embeddingBuffer;
-      ids             = hf.ids;
+      ids = hf.ids;
     } else {
       embeddingBuffer = await fetchBufferCached(
         assetUrl(this.manifest.catalog.embeddings),
         version,
-        (ratio, loaded, total, cached) => onStage?.("catalog", ratio * 0.92, loaded, total, cached),
+        (ratio, loaded, total, cached) => onStage?.('catalog', ratio * 0.92, loaded, total, cached),
       );
       ids = await fetchJsonCached(
         assetUrl(this.manifest.catalog.card_ids),
         version,
-        (ratio, loaded, total, cached) => onStage?.("catalog", 0.92 + ratio * 0.08, loaded, total, cached),
+        (ratio, loaded, total, cached) =>
+          onStage?.('catalog', 0.92 + ratio * 0.08, loaded, total, cached),
       );
     }
     const secondarySource = resolveSecondaryIdSource(this.manifest.catalog);
@@ -931,7 +945,7 @@ class WorkerRuntime {
     const dims = this.manifest.catalog.dims;
     // When using HuggingFace catalogs the manifest has rows: 0 (unknown at
     // authoring time); fall back to ids.length so requestedRows is correct.
-    const declaredRows  = this.manifest.catalog.rows || ids.length;
+    const declaredRows = this.manifest.catalog.rows || ids.length;
     const requestedRows = this.catalogLimit
       ? Math.min(this.catalogLimit, declaredRows, ids.length)
       : Math.min(declaredRows, ids.length);
@@ -939,14 +953,15 @@ class WorkerRuntime {
     // Diagnostic-only catalog limiting still fetches the monolithic asset, so
     // it does not remove the transient load peak.  It does keep only the small
     // prefix after load, which is enough to test steady-state catalog pressure.
-    const retainedEmbeddingBuffer = requestedRows < declaredRows
-      ? embeddingBuffer.slice(0, embeddingBytes)
-      : embeddingBuffer;
+    const retainedEmbeddingBuffer =
+      requestedRows < declaredRows ? embeddingBuffer.slice(0, embeddingBytes) : embeddingBuffer;
     this.embeddings = wrapFloat16Buffer(retainedEmbeddingBuffer);
     this.cardIds = requestedRows < ids.length ? ids.slice(0, requestedRows) : ids;
     this.secondaryIdField = secondarySource?.fieldName ?? null;
     this.secondaryIds = Array.isArray(secondaryIds)
-      ? (requestedRows < secondaryIds.length ? secondaryIds.slice(0, requestedRows) : secondaryIds)
+      ? requestedRows < secondaryIds.length
+        ? secondaryIds.slice(0, requestedRows)
+        : secondaryIds
       : null;
     this.catalogRows = Math.min(
       requestedRows,
@@ -973,7 +988,12 @@ class WorkerRuntime {
     );
     const t2 = performance.now();
     const outputs = await this.detector.run({
-      [this.inputNames.detector]: new ort.Tensor("float32", input, [1, 3, DETECTOR_SIZE, DETECTOR_SIZE]),
+      [this.inputNames.detector]: new ort.Tensor('float32', input, [
+        1,
+        3,
+        DETECTOR_SIZE,
+        DETECTOR_SIZE,
+      ]),
     });
     const t3 = performance.now();
     const cornersRaw = Array.from(outputs[this.detector.outputNames[0]].data).slice(0, 8);
@@ -990,7 +1010,7 @@ class WorkerRuntime {
       ]);
     }
 
-    this._lastRawCorners = points.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join("  ");
+    this._lastRawCorners = points.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join('  ');
     const t4 = performance.now();
 
     const confidence = sharpness ?? sigmoid(presenceLogit);
@@ -1014,17 +1034,16 @@ class WorkerRuntime {
     const width = frameCanvas.width;
     const height = frameCanvas.height;
     const srcPts = [
-      corners[0][0] * width, corners[0][1] * height,
-      corners[1][0] * width, corners[1][1] * height,
-      corners[2][0] * width, corners[2][1] * height,
-      corners[3][0] * width, corners[3][1] * height,
+      corners[0][0] * width,
+      corners[0][1] * height,
+      corners[1][0] * width,
+      corners[1][1] * height,
+      corners[2][0] * width,
+      corners[2][1] * height,
+      corners[3][0] * width,
+      corners[3][1] * height,
     ];
-    const dstPts = [
-      0, 0,
-      DEWARP_W - 1, 0,
-      DEWARP_W - 1, DEWARP_H - 1,
-      0, DEWARP_H - 1,
-    ];
+    const dstPts = [0, 0, DEWARP_W - 1, 0, DEWARP_W - 1, DEWARP_H - 1, 0, DEWARP_H - 1];
     const sourcePoints = [
       [srcPts[0], srcPts[1]],
       [srcPts[2], srcPts[3]],
@@ -1039,7 +1058,9 @@ class WorkerRuntime {
     ];
     const inverse = computeHomography(targetPoints, sourcePoints);
     const t1 = performance.now();
-    const srcData = frameCanvas.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, width, height);
+    const srcData = frameCanvas
+      .getContext('2d', { willReadFrequently: true })
+      .getImageData(0, 0, width, height);
     const dstData = this.dewarpImageData;
     const t2 = performance.now();
 
@@ -1085,10 +1106,17 @@ class WorkerRuntime {
     );
     const t2 = performance.now();
     const outputs = await this.embedder.run({
-      [this.inputNames.embedder]: new ort.Tensor("float32", input, [1, 3, EMBEDDER_SIZE, EMBEDDER_SIZE]),
+      [this.inputNames.embedder]: new ort.Tensor('float32', input, [
+        1,
+        3,
+        EMBEDDER_SIZE,
+        EMBEDDER_SIZE,
+      ]),
     });
     const t3 = performance.now();
-    const embedding = normalizeEmbedding(Float32Array.from(outputs[this.embedder.outputNames[0]].data));
+    const embedding = normalizeEmbedding(
+      Float32Array.from(outputs[this.embedder.outputNames[0]].data),
+    );
     const t4 = performance.now();
     return {
       embedding,
@@ -1105,14 +1133,14 @@ class WorkerRuntime {
   async identify(cropCanvas) {
     const upright = await this.embed(cropCanvas);
     const tSearchStart = performance.now();
-    let best = { ...this.search(upright.embedding), orientation: "upright" };
+    let best = { ...this.search(upright.embedding), orientation: 'upright' };
     let searchMs = performance.now() - tSearchStart;
     let timing = upright.timing;
 
     if (this.rotationInvariant) {
       const rotated = await this.embed(cropCanvas, true);
       const tRotatedSearchStart = performance.now();
-      const rotatedBest = { ...this.search(rotated.embedding), orientation: "rotated_180" };
+      const rotatedBest = { ...this.search(rotated.embedding), orientation: 'rotated_180' };
       searchMs += performance.now() - tRotatedSearchStart;
       timing = sumTiming(timing, rotated.timing);
       best = chooseBetterMatch(best, rotatedBest);
@@ -1166,7 +1194,7 @@ async function processFrame(bitmap, captureRequested = false, includeDebugBitmap
   const tFrameStart = performance.now();
   if (!frameCanvas || frameCanvas.width !== bitmap.width || frameCanvas.height !== bitmap.height) {
     frameCanvas = new OffscreenCanvas(bitmap.width, bitmap.height);
-    frameCtx = frameCanvas.getContext("2d", { willReadFrequently: true });
+    frameCtx = frameCanvas.getContext('2d', { willReadFrequently: true });
   }
   frameCtx.drawImage(bitmap, 0, 0);
   bitmap.close();
@@ -1176,7 +1204,7 @@ async function processFrame(bitmap, captureRequested = false, includeDebugBitmap
   let captureFrameBitmap = null;
   if (captureRequested) {
     const snap = new OffscreenCanvas(frameCanvas.width, frameCanvas.height);
-    snap.getContext("2d").drawImage(frameCanvas, 0, 0);
+    snap.getContext('2d').drawImage(frameCanvas, 0, 0);
     captureFrameBitmap = snap.transferToImageBitmap();
   }
   const tCaptureReady = performance.now();
@@ -1190,25 +1218,34 @@ async function processFrame(bitmap, captureRequested = false, includeDebugBitmap
 
   if (!detection.cardPresent) {
     const transfer0 = captureFrameBitmap ? [captureFrameBitmap] : [];
-    self.postMessage({
-      type: "result",
-      captureRequested,
-      captureFrameBitmap,
-      cardPresent: false,
-      cornersValid: false,
-      corners: detection.corners,
-      sharpness: detection.sharpness,
-      confidence: detection.confidence,
-      cardId: null,
-      secondaryId: null,
-      secondaryIdField: runtime?.secondaryIdField ?? null,
-      score: null,
-      rawCorners: runtime._lastRawCorners,
-      detectorInput: runtime._lastDetectorInput,
-      detectorBitmap: null,
-      cropBitmap: null,
-      timing: roundTiming({ ...baseTiming, dewarpMs: 0, embedMs: 0, searchMs: 0, totalMs: performance.now() - tFrameStart }),
-    }, transfer0);
+    self.postMessage(
+      {
+        type: 'result',
+        captureRequested,
+        captureFrameBitmap,
+        cardPresent: false,
+        cornersValid: false,
+        corners: detection.corners,
+        sharpness: detection.sharpness,
+        confidence: detection.confidence,
+        cardId: null,
+        secondaryId: null,
+        secondaryIdField: runtime?.secondaryIdField ?? null,
+        score: null,
+        rawCorners: runtime._lastRawCorners,
+        detectorInput: runtime._lastDetectorInput,
+        detectorBitmap: null,
+        cropBitmap: null,
+        timing: roundTiming({
+          ...baseTiming,
+          dewarpMs: 0,
+          embedMs: 0,
+          searchMs: 0,
+          totalMs: performance.now() - tFrameStart,
+        }),
+      },
+      transfer0,
+    );
     return;
   }
 
@@ -1224,25 +1261,34 @@ async function processFrame(bitmap, captureRequested = false, includeDebugBitmap
   if (!cornersValid) {
     const transfer1 = detectorBitmap ? [detectorBitmap] : [];
     if (captureFrameBitmap) transfer1.push(captureFrameBitmap);
-    self.postMessage({
-      type: "result",
-      captureRequested,
-      captureFrameBitmap,
-      cardPresent: true,
-      cornersValid: false,
-      corners: detection.corners,
-      sharpness: detection.sharpness,
-      confidence: detection.confidence,
-      cardId: null,
-      secondaryId: null,
-      secondaryIdField: runtime?.secondaryIdField ?? null,
-      score: null,
-      rawCorners: runtime._lastRawCorners,
-      detectorInput: runtime._lastDetectorInput,
-      detectorBitmap,
-      cropBitmap: null,
-      timing: roundTiming({ ...baseTiming, dewarpMs: 0, embedMs: 0, searchMs: 0, totalMs: performance.now() - tFrameStart }),
-    }, transfer1);
+    self.postMessage(
+      {
+        type: 'result',
+        captureRequested,
+        captureFrameBitmap,
+        cardPresent: true,
+        cornersValid: false,
+        corners: detection.corners,
+        sharpness: detection.sharpness,
+        confidence: detection.confidence,
+        cardId: null,
+        secondaryId: null,
+        secondaryIdField: runtime?.secondaryIdField ?? null,
+        score: null,
+        rawCorners: runtime._lastRawCorners,
+        detectorInput: runtime._lastDetectorInput,
+        detectorBitmap,
+        cropBitmap: null,
+        timing: roundTiming({
+          ...baseTiming,
+          dewarpMs: 0,
+          embedMs: 0,
+          searchMs: 0,
+          totalMs: performance.now() - tFrameStart,
+        }),
+      },
+      transfer1,
+    );
     return;
   }
 
@@ -1257,7 +1303,7 @@ async function processFrame(bitmap, captureRequested = false, includeDebugBitmap
   if (cropBitmap) transfer2.push(cropBitmap);
   if (captureFrameBitmap) transfer2.push(captureFrameBitmap);
   const resultMessage = {
-    type: "result",
+    type: 'result',
     captureRequested,
     captureFrameBitmap,
     cardPresent: true,
@@ -1290,16 +1336,13 @@ async function processFrame(bitmap, captureRequested = false, includeDebugBitmap
 
 function sumTiming(first, second) {
   const keys = new Set([...Object.keys(first), ...Object.keys(second)]);
-  return Object.fromEntries(
-    [...keys].map((key) => [key, (first[key] ?? 0) + (second[key] ?? 0)]),
-  );
+  return Object.fromEntries([...keys].map((key) => [key, (first[key] ?? 0) + (second[key] ?? 0)]));
 }
 
 function roundTiming(timing) {
-  return Object.fromEntries(Object.entries(timing).map(([key, value]) => [
-    key,
-    Math.round((Number(value) || 0) * 10) / 10,
-  ]));
+  return Object.fromEntries(
+    Object.entries(timing).map(([key, value]) => [key, Math.round((Number(value) || 0) * 10) / 10]),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -1308,17 +1351,18 @@ function roundTiming(timing) {
 
 self.onmessage = async ({ data }) => {
   try {
-    if (data.type === "init") {
+    if (data.type === 'init') {
       const enableWebGpu = data.enableWebGpu === true;
       const webgpuReady = enableWebGpu ? await configureWebGpu() : false;
       const useWebGpu = webgpuReady; // only true if both requested and available
-      const inferenceMode = useWebGpu ? "WebGPU" : "WASM";
-      self.postMessage({ type: "progress", stage: "webgpu", inferenceMode });
-      self.postMessage({ type: "progress", stage: "dewarp", ratio: 1 });
+      const inferenceMode = useWebGpu ? 'WebGPU' : 'WASM';
+      self.postMessage({ type: 'progress', stage: 'webgpu', inferenceMode });
+      self.postMessage({ type: 'progress', stage: 'dewarp', ratio: 1 });
 
-      const catalogLimit = Number.isFinite(data.catalogLimit) && data.catalogLimit > 0
-        ? Math.floor(data.catalogLimit)
-        : null;
+      const catalogLimit =
+        Number.isFinite(data.catalogLimit) && data.catalogLimit > 0
+          ? Math.floor(data.catalogLimit)
+          : null;
       runtime = new WorkerRuntime(
         data.manifest,
         useWebGpu,
@@ -1327,30 +1371,29 @@ self.onmessage = async ({ data }) => {
         data.minCornerConfidence,
       );
       await runtime.load((stage, ratio, loaded, total, cached) => {
-        self.postMessage({ type: "progress", stage, ratio, loaded, total, cached });
+        self.postMessage({ type: 'progress', stage, ratio, loaded, total, cached });
       });
 
       self.postMessage({
-        type: "ready",
+        type: 'ready',
         inferenceMode,
         numThreads: runtime.numThreads ?? 1,
         catalogRows: runtime.catalogRows,
         catalogTotalRows: runtime.catalogTotalRows,
         catalogLimit: runtime.catalogLimit,
       });
-
-    } else if (data.type === "frame") {
+    } else if (data.type === 'frame') {
       await processFrame(
         data.bitmap,
         data.captureRequested ?? false,
         data.includeDebugBitmaps ?? false,
       );
-    } else if (data.type === "config") {
+    } else if (data.type === 'config') {
       runtime?.updateConfig({
         minCornerConfidence: data.minCornerConfidence,
       });
     }
   } catch (error) {
-    self.postMessage({ type: "error", message: error?.message ?? String(error) });
+    self.postMessage({ type: 'error', message: error?.message ?? String(error) });
   }
 };

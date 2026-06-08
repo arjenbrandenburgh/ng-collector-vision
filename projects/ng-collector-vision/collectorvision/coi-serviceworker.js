@@ -20,24 +20,24 @@
 
 const SW_VERSION = 2;
 
-self.addEventListener("install", () => {
+self.addEventListener('install', () => {
   // Skip waiting so the new SW takes over without requiring user navigation.
   self.skipWaiting();
 });
 
-self.addEventListener("activate", (event) => {
+self.addEventListener('activate', (event) => {
   // Claim all existing clients immediately so they benefit from the headers
   // on the very next fetch, rather than waiting for a navigation.
   event.waitUntil(self.clients.claim());
 });
 
-self.addEventListener("message", (event) => {
-  if (event.data === "sw-version") {
-    event.source.postMessage({ type: "sw-version", version: SW_VERSION });
+self.addEventListener('message', (event) => {
+  if (event.data === 'sw-version') {
+    event.source.postMessage({ type: 'sw-version', version: SW_VERSION });
   }
 });
 
-self.addEventListener("fetch", (event) => {
+self.addEventListener('fetch', (event) => {
   const { request } = event;
 
   // Only intercept same-origin requests.  Cross-origin requests (CDN fonts,
@@ -50,21 +50,21 @@ self.addEventListener("fetch", (event) => {
 
   // range requests (e.g. video seeks) are not compatible with Response
   // construction from a cloned body; skip them.
-  if (request.headers.get("range")) {
+  if (request.headers.get('range')) {
     return;
   }
 
   event.respondWith(
     fetch(request).then((response) => {
       // Opaque responses (cross-origin no-cors) cannot be cloned safely.
-      if (response.type === "opaque" || response.type === "error") {
+      if (response.type === 'opaque' || response.type === 'error') {
         return response;
       }
 
       const newHeaders = new Headers(response.headers);
-      newHeaders.set("Cross-Origin-Opener-Policy", "same-origin");
-      newHeaders.set("Cross-Origin-Embedder-Policy", "credentialless");
-      newHeaders.set("Cross-Origin-Resource-Policy", "cross-origin");
+      newHeaders.set('Cross-Origin-Opener-Policy', 'same-origin');
+      newHeaders.set('Cross-Origin-Embedder-Policy', 'credentialless');
+      newHeaders.set('Cross-Origin-Resource-Policy', 'cross-origin');
 
       return new Response(response.body, {
         status: response.status,
