@@ -209,12 +209,30 @@ type ScannerStatus =
 
 ### Asset base path
 
-Override the default `/collectorvision` base if you serve assets from a CDN:
+`CV_ASSET_BASE_PATH` controls where game manifests and sound files are fetched from. Override it to serve these from your own platform or CDN:
 
 ```ts
-import { CV_ASSET_BASE_PATH } from 'ng-collector-vision';
+import { CV_ASSET_BASE_PATH } from '@cybey/ng-collector-vision';
 
-providers: [{ provide: CV_ASSET_BASE_PATH, useValue: 'https://cdn.example.com/cv' }];
+providers: [{ provide: CV_ASSET_BASE_PATH, useValue: 'https://platform.example.com' }]
+```
+
+The scanner worker and vendor files always load from the **local** origin — cross-origin workers require explicit CORS headers that most hosts don't provide.
+
+### Cloudflare Pages (and other hosts with a per-file size limit)
+
+The bundled ONNX Runtime WASM binary is ~27 MB. Cloudflare Pages has a 25 MB per-file limit. Redirect the WASM to jsDelivr using the pre-built constant:
+
+```ts
+import { CV_WASM_BASE_PATH, ORT_CDN_WASM_PATH } from '@cybey/ng-collector-vision';
+
+providers: [{ provide: CV_WASM_BASE_PATH, useValue: ORT_CDN_WASM_PATH }]
+```
+
+Or point at your own R2 bucket:
+
+```ts
+providers: [{ provide: CV_WASM_BASE_PATH, useValue: 'https://pub-xxx.r2.dev/wasm/' }]
 ```
 
 ---

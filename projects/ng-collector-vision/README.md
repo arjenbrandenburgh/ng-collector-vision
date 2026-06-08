@@ -397,15 +397,33 @@ Where `scanner` is a `viewChild(CardScannerComponent)` reference.
 
 ### Asset base path
 
-If you serve CollectorVision assets from a CDN rather than the same origin:
+`CV_ASSET_BASE_PATH` controls where game manifests and sound files are fetched from. Override to serve these from your own platform or CDN:
 
 ```ts
 import { CV_ASSET_BASE_PATH } from '@cybey/ng-collector-vision';
 
-providers: [{ provide: CV_ASSET_BASE_PATH, useValue: 'https://cdn.example.com/cv' }];
+providers: [{ provide: CV_ASSET_BASE_PATH, useValue: 'https://platform.example.com' }]
 ```
 
-The worker, vendor files, and manifest are all resolved relative to this path.
+> **Note:** `scanner.worker.mjs` and its bundled vendor files always load from the **local** origin — cross-origin workers require explicit `Access-Control-Allow-Origin` headers that most servers don't provide. `CV_ASSET_BASE_PATH` does not control the worker path.
+
+### Cloudflare Pages and hosts with a per-file size limit
+
+The bundled ONNX Runtime WASM binary (`ort-wasm-simd-threaded.asyncify.wasm`) is ~27 MB, which exceeds Cloudflare Pages' per-file limit. Redirect it to a CDN using the pre-built constant:
+
+```ts
+import { CV_WASM_BASE_PATH, ORT_CDN_WASM_PATH } from '@cybey/ng-collector-vision';
+
+providers: [{ provide: CV_WASM_BASE_PATH, useValue: ORT_CDN_WASM_PATH }]
+```
+
+`ORT_CDN_WASM_PATH` points to `onnxruntime-web@1.24.3` on jsDelivr. Alternatively, use your own R2 bucket or any URL that serves the WASM with correct `Content-Type: application/wasm` headers:
+
+```ts
+providers: [{ provide: CV_WASM_BASE_PATH, useValue: 'https://pub-xxx.r2.dev/wasm/' }]
+```
+
+The WASM file remains in the npm package for hosts that can serve it locally — `CV_WASM_BASE_PATH` is purely opt-in.
 
 ### Custom sounds
 
