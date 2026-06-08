@@ -49,12 +49,12 @@ jobs:
           TAG="${{ github.ref_name }}"
           VERSION="${TAG#v}"
           npm version --no-git-tag-version "$VERSION" \
-            --prefix dist/ng-collector-vision
+            --prefix ./dist/ng-collector-vision
 
       # ── Publish ──────────────────────────────────────────────────────────────
 
       - name: Publish to npm
-        run: npm publish dist/ng-collector-vision --access public --provenance
+        run: npm publish ./dist/ng-collector-vision --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
