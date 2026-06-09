@@ -29,7 +29,7 @@ export const CV_ASSET_BASE_PATH = new InjectionToken<string>('CV_ASSET_BASE_PATH
  *
  * **Cloudflare Pages / any host with a per-file size limit:**
  * ```ts
- * import { CV_WASM_BASE_PATH, ORT_CDN_WASM_PATH } from '@cybey/ng-collector-vision';
+ * import { CV_WASM_BASE_PATH, ORT_CDN_WASM_PATH } from '@hippolink/ng-collector-vision';
  *
  * providers: [{ provide: CV_WASM_BASE_PATH, useValue: ORT_CDN_WASM_PATH }]
  * ```

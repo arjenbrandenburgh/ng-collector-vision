@@ -8,7 +8,7 @@ Point a camera at a Magic: The Gathering, Pokémon, Lorcana, or One Piece card. 
 <cv-card-scanner game="magic" (cardDetected)="onCard($event)" />
 ```
 
-[![npm version](https://img.shields.io/npm/v/%40cybey%2Fng-collector-vision.svg)](https://www.npmjs.com/package/@cybey/ng-collector-vision)
+[![npm version](https://img.shields.io/npm/v/%40hippolink%2Fng-collector-vision.svg)](https://www.npmjs.com/package/@hippolink/ng-collector-vision)
 [![license: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](https://github.com/HanClinto/CollectorVision/blob/main/LICENSE)
 
 **[Live demo →](https://hippolink-app.github.io/ng-collector-vision/)**
@@ -52,7 +52,7 @@ CollectorVision ships a plain JavaScript Web Worker and applet. `ng-collector-vi
 ## Installation
 
 ```bash
-npm install @cybey/ng-collector-vision
+npm install @hippolink/ng-collector-vision
 ```
 
 ### 1 — Copy runtime assets (`angular.json`)
@@ -152,7 +152,7 @@ export const appConfig: ApplicationConfig = {
 ```ts
 // my-scanner.component.ts
 import { Component } from '@angular/core';
-import { CardScannerComponent, type CardDetection } from '@cybey/ng-collector-vision';
+import { CardScannerComponent, type CardDetection } from '@hippolink/ng-collector-vision';
 
 @Component({
   selector: 'app-my-scanner',
@@ -400,7 +400,7 @@ Where `scanner` is a `viewChild(CardScannerComponent)` reference.
 `CV_ASSET_BASE_PATH` controls where game manifests and sound files are fetched from. Override to serve these from your own platform or CDN:
 
 ```ts
-import { CV_ASSET_BASE_PATH } from '@cybey/ng-collector-vision';
+import { CV_ASSET_BASE_PATH } from '@hippolink/ng-collector-vision';
 
 providers: [{ provide: CV_ASSET_BASE_PATH, useValue: 'https://platform.example.com' }];
 ```
@@ -412,7 +412,7 @@ providers: [{ provide: CV_ASSET_BASE_PATH, useValue: 'https://platform.example.c
 The bundled ONNX Runtime WASM binary (`ort-wasm-simd-threaded.asyncify.wasm`) is ~27 MB, which exceeds Cloudflare Pages' per-file limit. Redirect it to a CDN using the pre-built constant:
 
 ```ts
-import { CV_WASM_BASE_PATH, ORT_CDN_WASM_PATH } from '@cybey/ng-collector-vision';
+import { CV_WASM_BASE_PATH, ORT_CDN_WASM_PATH } from '@hippolink/ng-collector-vision';
 
 providers: [{ provide: CV_WASM_BASE_PATH, useValue: ORT_CDN_WASM_PATH }];
 ```

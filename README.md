@@ -6,7 +6,7 @@ Angular 22 component library that wraps [CollectorVision](https://github.com/Han
 <cv-card-scanner game="magic" (cardDetected)="onCard($event)" />
 ```
 
-[![npm version](https://img.shields.io/npm/v/%40cybey%2Fng-collector-vision.svg)](https://www.npmjs.com/package/@cybey/ng-collector-vision)
+[![npm version](https://img.shields.io/npm/v/%40hippolink%2Fng-collector-vision.svg)](https://www.npmjs.com/package/@hippolink/ng-collector-vision)
 [![license: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 
 **[Live demo →](https://hippolink-app.github.io/ng-collector-vision/)**
@@ -31,7 +31,7 @@ Try the original web demo at **https://hanclinto.github.io/CollectorVision/**
 ## Installation
 
 ```bash
-npm install @cybey/ng-collector-vision
+npm install @hippolink/ng-collector-vision
 ```
 
 ## Setup
@@ -212,7 +212,7 @@ type ScannerStatus =
 `CV_ASSET_BASE_PATH` controls where game manifests and sound files are fetched from. Override it to serve these from your own platform or CDN:
 
 ```ts
-import { CV_ASSET_BASE_PATH } from '@cybey/ng-collector-vision';
+import { CV_ASSET_BASE_PATH } from '@hippolink/ng-collector-vision';
 
 providers: [{ provide: CV_ASSET_BASE_PATH, useValue: 'https://platform.example.com' }];
 ```
@@ -224,7 +224,7 @@ The scanner worker and vendor files always load from the **local** origin — cr
 The bundled ONNX Runtime WASM binary is ~27 MB. Cloudflare Pages has a 25 MB per-file limit. Redirect the WASM to jsDelivr using the pre-built constant:
 
 ```ts
-import { CV_WASM_BASE_PATH, ORT_CDN_WASM_PATH } from '@cybey/ng-collector-vision';
+import { CV_WASM_BASE_PATH, ORT_CDN_WASM_PATH } from '@hippolink/ng-collector-vision';
 
 providers: [{ provide: CV_WASM_BASE_PATH, useValue: ORT_CDN_WASM_PATH }];
 ```
