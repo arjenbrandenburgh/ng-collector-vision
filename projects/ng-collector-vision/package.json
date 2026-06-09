@@ -4,7 +4,7 @@
   "license": "AGPL-3.0-or-later",
   "repository": {
     "type": "git",
-    "url": "https://github.com/hippolink-app/ng-collector-vision"
+    "url": "https://github.com/HippoLink-app/ng-collector-vision"
   },
   "peerDependencies": {
     "@angular/common": "^22.0.0",
