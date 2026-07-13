@@ -67,6 +67,9 @@ export class CardScannerComponent {
   /** Minimum embedding similarity score to pass a frame to the confirmation bucket [0–1]. Default 0.5. */
   readonly minAcceptanceScore = input<number>(0.5);
 
+  /** Score below which a confirmed detection is flagged `needsReview` [0–1]. Default 0.8. */
+  readonly reviewThreshold = input<number>(REVIEW_THRESHOLD);
+
   /** Number of consecutive matching frames required before emitting `cardDetected`. Default 2. */
   readonly consecutiveMatches = input<number>(CONSECUTIVE_MATCHES);
 
@@ -312,7 +315,7 @@ export class CardScannerComponent {
   }
 
   #emit(confirmed: ConfirmedResult): void {
-    const needsReview = confirmed.score < REVIEW_THRESHOLD;
+    const needsReview = confirmed.score < this.reviewThreshold();
     const detection: CardDetection = {
       cardId: confirmed.cardId,
       secondaryId: confirmed.secondaryId ?? null,

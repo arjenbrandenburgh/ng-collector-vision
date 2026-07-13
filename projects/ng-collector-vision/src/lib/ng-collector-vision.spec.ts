@@ -287,6 +287,17 @@ describe('CardScannerComponent', () => {
       expect(createScanner().minAcceptanceScore()).toBe(0.5);
     });
 
+    it('reviewThreshold defaults to REVIEW_THRESHOLD', () => {
+      expect(createScanner().reviewThreshold()).toBe(REVIEW_THRESHOLD);
+    });
+
+    it('reviewThreshold reflects a custom input value', () => {
+      const fixture = TestBed.createComponent(CardScannerComponent);
+      fixture.componentRef.setInput('game', 'magic');
+      fixture.componentRef.setInput('reviewThreshold', 0.65);
+      expect(fixture.componentInstance.reviewThreshold()).toBe(0.65);
+    });
+
     it('consecutiveMatches defaults to CONSECUTIVE_MATCHES', () => {
       expect(createScanner().consecutiveMatches()).toBe(CONSECUTIVE_MATCHES);
     });
