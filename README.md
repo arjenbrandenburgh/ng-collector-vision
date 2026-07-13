@@ -155,6 +155,7 @@ export class MyComponent {
 | `game`                | `CardScannerGame` | **required** | Active game family. Changing this restarts the scanner.                                        |
 | `minCornerConfidence` | `number`          | `0.02`       | Corner-detector gate threshold `[0–1]`. Lower = more sensitive. Applied live without restart.  |
 | `minAcceptanceScore`  | `number`          | `0.5`        | Minimum embedding similarity to pass a frame to the confirmation bucket `[0–1]`. Applied live. |
+| `reviewThreshold`     | `number`          | `0.8`        | Score below which a confirmed detection is flagged `needsReview` `[0–1]`. Applied live.        |
 | `consecutiveMatches`  | `number`          | `2`          | Consecutive matching frames needed before emitting `cardDetected`. Applied live.               |
 | `cooldownMs`          | `number`          | `3500`       | Cooldown (ms) before the same card can be detected again. Applied live.                        |
 | `groupBySecondaryId`  | `boolean`         | `true`       | Group alternate printings of the same card by oracle/secondary ID. Applied live.               |
@@ -189,7 +190,7 @@ interface CardDetection {
   corners: [number, number][]; // Normalized corner coordinates
   sharpness: number | null;
   orientation: 'upright' | 'rotated_180' | null;
-  needsReview: boolean; // score < 0.8 — consumer should flag for verification
+  needsReview: boolean; // score < reviewThreshold — consumer should flag for verification
   detectedAt: string; // ISO 8601 timestamp
 }
 ```
