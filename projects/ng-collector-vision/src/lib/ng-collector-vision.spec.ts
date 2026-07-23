@@ -416,7 +416,7 @@ describe('CardScannerComponent', () => {
 
     /** Flush the microtask queue (and any zero-delay timers) before continuing. */
     function flush(): Promise<void> {
-      return new Promise(resolve => setTimeout(resolve, 0));
+      return new Promise((resolve) => setTimeout(resolve, 0));
     }
 
     /** Drive a scanImage() call through worker init + a single result message. */
@@ -443,7 +443,7 @@ describe('CardScannerComponent', () => {
         catalogLimit: null,
       });
       await flush(); // createImageBitmap + #downscaleIfNeeded + postMessage
-      expect(worker.posted.some(m => (m as { type?: string }).type === 'frame')).toBe(true);
+      expect(worker.posted.some((m) => (m as { type?: string }).type === 'frame')).toBe(true);
       worker.emit({ type: 'result', ...result });
       return outcomePromise;
     }
@@ -479,7 +479,7 @@ describe('CardScannerComponent', () => {
     it('resolves { ok: true, detection } and emits cardDetected from a single result (no second frame needed)', async () => {
       const comp = createImageScanner();
       const emitted: unknown[] = [];
-      comp.cardDetected.subscribe(d => emitted.push(d));
+      comp.cardDetected.subscribe((d) => emitted.push(d));
       const file = new File(['x'], 'card.jpg', { type: 'image/jpeg' });
 
       const outcome = await driveScan(comp, file, {

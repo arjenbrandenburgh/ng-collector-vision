@@ -577,7 +577,11 @@ export class CardScannerComponent {
       pending.resolve({ ok: false, reason: 'no-card', message: 'No card detected in this image.' });
       return;
     }
-    if (!result.cardId || !Number.isFinite(result.score) || result.score! < this.minAcceptanceScore()) {
+    if (
+      !result.cardId ||
+      !Number.isFinite(result.score) ||
+      result.score! < this.minAcceptanceScore()
+    ) {
       pending.resolve({
         ok: false,
         reason: 'low-score',
