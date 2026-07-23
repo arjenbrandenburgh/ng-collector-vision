@@ -19,6 +19,7 @@ import {
   CONSECUTIVE_MATCHES,
   COOLDOWN_MS,
   CORNER_OVERLAY_COLOUR,
+  MAX_IMAGE_LONG_EDGE_PX,
   MIN_CORNER_CONFIDENCE,
   REVIEW_THRESHOLD,
   SCAN_INTERVAL_MS,
@@ -29,6 +30,7 @@ import type {
   CardDetection,
   CardScannerGame,
   ConfirmedResult,
+  ImageScanOutcome,
   ScannerStatus,
   WorkerMsg,
   WorkerResultMsg,
@@ -42,6 +44,11 @@ import type {
  *
  * Changing the `game` input restarts the scanner automatically.
  * All other inputs update live without restarting.
+ *
+ * Also supports scanning still images (e.g. uploaded files) via `scanImage()`,
+ * which runs the same detector/embedder pipeline against a single bitmap
+ * instead of a live camera stream. Use `pauseCamera()`/`resumeCamera()` to
+ * switch between live and still-image modes without tearing down the worker.
  *
  * ### Quick start
  * ```html
@@ -138,6 +145,16 @@ export class CardScannerComponent {
   #audioCtx: AudioContext | null = null;
   #audioBuffers = new Map<'confident' | 'uncertain', AudioBuffer>();
 
+  // ── Still-image scanning state ───────────────────────────────────────────
+  #pendingImageScan: {
+    resolve: (outcome: ImageScanOutcome) => void;
+    reject: (err: Error) => void;
+  } | null = null;
+  #imageScanChain: Promise<unknown> | null = null;
+  #workerInitPromise: Promise<void> | null = null;
+  #workerReadyResolve: (() => void) | null = null;
+  #pauseRequested = false;
+
   #closed = false;
 
   constructor() {
@@ -157,11 +174,27 @@ export class CardScannerComponent {
       void this.openScanner();
     });
 
-    // Restart when game changes while the scanner is active.
+    // Restart when game changes while the scanner is active. Every effect()
+    // runs once immediately on creation to establish tracking -- that first
+    // run is not a genuine change and must be skipped, otherwise it can race
+    // a scanImage()-triggered worker init that's already in flight and spawn
+    // a second worker.
+    let isFirstGameEffectRun = true;
     effect(() => {
       this.game();
       untracked(() => {
-        if (this.status() !== 'idle') void this.openScanner();
+        if (isFirstGameEffectRun) {
+          isFirstGameEffectRun = false;
+          return;
+        }
+        if (this.status() === 'idle') return;
+        if (this.#stream) {
+          void this.openScanner();
+        } else if (this.#workerReady || this.#workerInitPromise) {
+          // Upload mode: re-init the manifest+worker for the new game
+          // without requesting the camera.
+          void this.#restartForImages();
+        }
       });
     });
 
@@ -200,6 +233,13 @@ export class CardScannerComponent {
   // ── Scanner lifecycle ─────────────────────────────────────────────────────
 
   async openScanner(): Promise<void> {
+    if (this.#pauseRequested) {
+      // The user already committed to upload mode (pauseCamera() ran)
+      // before this call got a chance to start -- this only happens for the
+      // automatic mount-time call racing a fast switch to upload mode.
+      // Bail out without tearing down any in-progress image scan.
+      return;
+    }
     this.#teardown();
     this.status.set('downloading');
     this.errorMessage.set('');
@@ -213,12 +253,9 @@ export class CardScannerComponent {
     );
 
     this.#abortCtrl = new AbortController();
-    const manifestUrl = `${this.#assetBase}/assets/${this.game()}/manifest.json`;
     let manifest: unknown;
     try {
-      const res = await fetch(manifestUrl, { signal: this.#abortCtrl.signal });
-      if (!res.ok) throw new Error(`Manifest fetch failed: HTTP ${res.status}`);
-      manifest = await res.json();
+      manifest = await this.#fetchManifest(this.#abortCtrl.signal);
     } catch (err) {
       if ((err as { name?: string }).name === 'AbortError') return;
       this.#setError(err instanceof Error ? err.message : 'Failed to load manifest.');
@@ -231,20 +268,51 @@ export class CardScannerComponent {
         video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: false,
       });
-      const video = this.videoEl()?.nativeElement;
-      if (video) {
-        video.srcObject = this.#stream;
-        await video.play();
-      }
-      if (this.playSounds()) {
-        this.#audioCtx = new AudioContext();
-        void this.#preloadSounds();
+      if (this.#pauseRequested) {
+        // User switched to upload mode while the permission prompt was pending.
+        this.#stream.getTracks().forEach((t) => t.stop());
+        this.#stream = null;
+      } else {
+        const video = this.videoEl()?.nativeElement;
+        if (video) {
+          video.srcObject = this.#stream;
+          await video.play();
+        }
+        if (this.playSounds()) {
+          this.#audioCtx = new AudioContext();
+          void this.#preloadSounds();
+        }
       }
     } catch {
+      if (this.#pauseRequested) {
+        // User already switched to upload mode before the camera resolved --
+        // a failed camera attempt must not disturb an in-progress (or
+        // already-initialised) image scan session.
+        return;
+      }
       this.#setError('Camera access denied. Allow camera permissions and try again.');
       return;
     }
 
+    if (this.#pauseRequested) {
+      // Switched to upload mode while getUserMedia was pending — a
+      // concurrent scanImage() call may have already spawned its own worker
+      // via #restartForImages(); don't spawn a second one here.
+      return;
+    }
+    this.#spawnWorker(manifest);
+  }
+
+  /** Fetch the CollectorVision manifest for the current `game`. */
+  async #fetchManifest(signal?: AbortSignal): Promise<unknown> {
+    const manifestUrl = `${this.#assetBase}/assets/${this.game()}/manifest.json`;
+    const res = await fetch(manifestUrl, { signal });
+    if (!res.ok) throw new Error(`Manifest fetch failed: HTTP ${res.status}`);
+    return res.json();
+  }
+
+  /** Spawn (or respawn) the scanner worker and post `init`. Does not await `ready`. */
+  #spawnWorker(manifest: unknown): void {
     try {
       this.#worker = new Worker(`collectorvision/${WORKER_FILENAME}`, { type: 'module' });
       this.#worker.addEventListener('message', (e: MessageEvent<WorkerMsg>) =>
@@ -266,6 +334,173 @@ export class CardScannerComponent {
     }
   }
 
+  /**
+   * Stop the live camera + scan/preview loops without terminating the
+   * worker. Use this (not `close()`) when switching to still-image (upload)
+   * mode, so `scanImage()` can keep using the already-initialised worker.
+   */
+  pauseCamera(): void {
+    this.#pauseRequested = true;
+    if (this.#scanTimer !== null) {
+      clearInterval(this.#scanTimer);
+      this.#scanTimer = null;
+    }
+    if (this.#previewFrame !== null) {
+      cancelAnimationFrame(this.#previewFrame);
+      this.#previewFrame = null;
+    }
+    this.#stream?.getTracks().forEach((t) => t.stop());
+    this.#stream = null;
+    this.#lastResult = null;
+    this.cornerConfidence.set(0);
+    this.#bucket.reset();
+    const video = this.videoEl()?.nativeElement;
+    if (video) video.srcObject = null;
+    const canvas = this.overlayCanvas()?.nativeElement;
+    if (canvas) canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  /**
+   * Re-acquire the camera and resume scanning after `pauseCamera()`. No-op
+   * if the camera is already active; call `openScanner()` first if the
+   * worker was never initialised.
+   */
+  async resumeCamera(): Promise<void> {
+    this.#pauseRequested = false;
+    if (this.#stream) return;
+    this.status.set('requesting-permission');
+    try {
+      this.#stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
+    } catch {
+      this.#setError('Camera access denied. Allow camera permissions and try again.');
+      return;
+    }
+    if (this.#pauseRequested) {
+      // User flipped back to upload mode while the permission prompt was pending.
+      this.#stream.getTracks().forEach((t) => t.stop());
+      this.#stream = null;
+      return;
+    }
+    const video = this.videoEl()?.nativeElement;
+    if (video) {
+      video.srcObject = this.#stream;
+      await video.play();
+    }
+    this.status.set('scanning');
+    if (this.#workerReady) {
+      this.#startScanLoop();
+      this.#startPreviewLoop();
+    }
+  }
+
+  /**
+   * Analyse a single still image (e.g. from a file upload) using the same
+   * detector + embedder pipeline as the live camera view. Does not require
+   * `getUserMedia` and must not be called while a live camera session is
+   * active — call `pauseCamera()` first.
+   *
+   * Bypasses `ConfirmationBucket`'s multi-frame streak requirement: a single
+   * image IS the confirmation. On success, emits `cardDetected` exactly like
+   * a live-camera confirmation (existing consumers need no changes) and
+   * resolves `{ ok: true, detection }`. On failure (no card / low score /
+   * unreadable file), does NOT emit `cardDetected`; resolves
+   * `{ ok: false, reason, message }`.
+   *
+   * Concurrent calls are queued and processed one at a time — the worker
+   * itself only ever processes one frame at a time (mirrors the live
+   * `#tick()` `#workerBusy` gate).
+   */
+  async scanImage(file: File | Blob): Promise<ImageScanOutcome> {
+    if (this.#stream) {
+      throw new Error(
+        'scanImage() cannot run while the live camera is active — call pauseCamera() first.',
+      );
+    }
+    const run = () => this.#scanImageInternal(file);
+    const next = (this.#imageScanChain ?? Promise.resolve()).then(run, run);
+    this.#imageScanChain = next.catch(() => undefined);
+    return next;
+  }
+
+  async #scanImageInternal(file: File | Blob): Promise<ImageScanOutcome> {
+    await this.#ensureWorkerReadyForImages();
+    if (this.status() === 'error') {
+      return {
+        ok: false,
+        reason: 'worker-error',
+        message: this.errorMessage() || 'Scanner failed to start.',
+      };
+    }
+
+    let bitmap: ImageBitmap;
+    try {
+      // EXIF-correct decode: camera frames never carry EXIF, so this was
+      // never needed on the live path, but uploaded JPEGs commonly do.
+      bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    } catch {
+      return { ok: false, reason: 'decode-error', message: 'Could not read this image file.' };
+    }
+    bitmap = await this.#downscaleIfNeeded(bitmap);
+
+    return new Promise<ImageScanOutcome>((resolve, reject) => {
+      this.#pendingImageScan = { resolve, reject };
+      this.#workerBusy = true;
+      try {
+        this.#worker!.postMessage({ type: 'frame', bitmap }, [bitmap]);
+      } catch (err) {
+        this.#pendingImageScan = null;
+        this.#workerBusy = false;
+        reject(err instanceof Error ? err : new Error('Failed to post frame to worker.'));
+      }
+    });
+  }
+
+  async #downscaleIfNeeded(bitmap: ImageBitmap): Promise<ImageBitmap> {
+    const longest = Math.max(bitmap.width, bitmap.height);
+    if (longest <= MAX_IMAGE_LONG_EDGE_PX) return bitmap;
+    const scale = MAX_IMAGE_LONG_EDGE_PX / longest;
+    const w = Math.round(bitmap.width * scale);
+    const h = Math.round(bitmap.height * scale);
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    canvas.getContext('2d')!.drawImage(bitmap, 0, 0, w, h);
+    bitmap.close();
+    return createImageBitmap(canvas);
+  }
+
+  /** (Re)initialise the worker for the current `game` without requesting the camera. */
+  async #restartForImages(): Promise<void> {
+    this.#teardown();
+    this.status.set('downloading');
+    this.errorMessage.set('');
+    this.downloadProgress.set(0);
+    let manifest: unknown;
+    try {
+      manifest = await this.#fetchManifest();
+    } catch (err) {
+      this.#setError(err instanceof Error ? err.message : 'Failed to load manifest.');
+      return;
+    }
+    await new Promise<void>((resolve) => {
+      this.#workerReadyResolve = resolve;
+      this.#spawnWorker(manifest);
+    });
+  }
+
+  async #ensureWorkerReadyForImages(): Promise<void> {
+    if (this.#workerReady) return;
+    if (!this.#workerInitPromise) {
+      this.#workerInitPromise = this.#restartForImages().finally(() => {
+        this.#workerInitPromise = null;
+      });
+    }
+    return this.#workerInitPromise;
+  }
+
   /** Stop the scanner and release all resources. Emits `scannerClosed`. */
   close(): void {
     this.#teardown();
@@ -283,17 +518,31 @@ export class CardScannerComponent {
       case 'ready':
         this.#workerReady = true;
         this.status.set('scanning');
-        this.#startScanLoop();
-        this.#startPreviewLoop();
+        if (this.#stream) {
+          this.#startScanLoop();
+          this.#startPreviewLoop();
+        }
+        this.#workerReadyResolve?.();
+        this.#workerReadyResolve = null;
         break;
       case 'result':
         this.#workerBusy = false;
+        if (this.#pendingImageScan) {
+          this.#resolveImageScan(msg);
+          break;
+        }
         this.#lastResult = msg;
         this.cornerConfidence.set(msg.confidence);
         this.#handleFrameResult(msg);
         break;
       case 'error':
         this.#workerBusy = false;
+        if (this.#pendingImageScan) {
+          const pending = this.#pendingImageScan;
+          this.#pendingImageScan = null;
+          pending.resolve({ ok: false, reason: 'worker-error', message: msg.message });
+          break;
+        }
         this.#setError(msg.message);
         break;
     }
@@ -314,7 +563,38 @@ export class CardScannerComponent {
     if (confirmed) this.#emit(confirmed);
   }
 
-  #emit(confirmed: ConfirmedResult): void {
+  /**
+   * Resolve a single-shot `scanImage()` call directly from one worker
+   * result, bypassing `ConfirmationBucket`'s multi-frame streak requirement
+   * (a still image only ever produces one result, so the bucket would never
+   * confirm it under the live-camera default of `consecutiveMatches`).
+   */
+  #resolveImageScan(result: WorkerResultMsg): void {
+    const pending = this.#pendingImageScan;
+    this.#pendingImageScan = null;
+    if (!pending) return;
+    if (!result.cardPresent || !result.cornersValid) {
+      pending.resolve({ ok: false, reason: 'no-card', message: 'No card detected in this image.' });
+      return;
+    }
+    if (
+      !result.cardId ||
+      !Number.isFinite(result.score) ||
+      result.score! < this.minAcceptanceScore()
+    ) {
+      pending.resolve({
+        ok: false,
+        reason: 'low-score',
+        message: 'Could not identify this card with enough confidence.',
+      });
+      return;
+    }
+    const confirmed: ConfirmedResult = { ...result, cardId: result.cardId, score: result.score! };
+    const detection = this.#emit(confirmed);
+    pending.resolve({ ok: true, detection });
+  }
+
+  #emit(confirmed: ConfirmedResult): CardDetection {
     const needsReview = confirmed.score < this.reviewThreshold();
     const detection: CardDetection = {
       cardId: confirmed.cardId,
@@ -332,6 +612,7 @@ export class CardScannerComponent {
     this.a11yAnnouncement.set(`Card ${label}: ${confirmed.cardId}`);
     this.#flash(!needsReview);
     this.cardDetected.emit(detection);
+    return detection;
   }
 
   // ── Scan loop ─────────────────────────────────────────────────────────────
@@ -527,6 +808,10 @@ export class CardScannerComponent {
     this.#audioBuffers.clear();
     const video = this.videoEl()?.nativeElement;
     if (video) video.srcObject = null;
+    this.#pendingImageScan?.reject(new Error('Scanner was closed while scanning.'));
+    this.#pendingImageScan = null;
+    this.#workerInitPromise = null;
+    this.#workerReadyResolve = null;
   }
 
   #setError(message: string): void {
