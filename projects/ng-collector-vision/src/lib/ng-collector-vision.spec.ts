@@ -234,6 +234,35 @@ describe('ConfirmationBucket', () => {
   });
 });
 
+// ── Fake Worker (for scanImage tests) ───────────────────────────────────────
+
+/** Minimal Worker stand-in: captures posted messages and lets tests drive `message` events. */
+class FakeWorker {
+  static instances: FakeWorker[] = [];
+  readonly posted: unknown[] = [];
+  #listeners: ((e: MessageEvent) => void)[] = [];
+
+  constructor(_url: string | URL, _opts?: WorkerOptions) {
+    FakeWorker.instances.push(this);
+  }
+
+  postMessage(msg: unknown): void {
+    this.posted.push(msg);
+  }
+
+  addEventListener(type: string, cb: (e: MessageEvent) => void): void {
+    if (type === 'message') this.#listeners.push(cb);
+  }
+
+  removeEventListener(): void {}
+  terminate(): void {}
+
+  /** Simulate a message arriving from the worker thread. */
+  emit(data: unknown): void {
+    for (const cb of this.#listeners) cb({ data } as MessageEvent);
+  }
+}
+
 // ── CardScannerComponent ───────────────────────────────────────────────────
 
 describe('CardScannerComponent', () => {
@@ -348,6 +377,163 @@ describe('CardScannerComponent', () => {
       fixture.componentRef.setInput('game', 'magic');
       // The token is injected — component creates without throwing.
       expect(fixture.componentInstance).toBeTruthy();
+    });
+  });
+
+  describe('scanImage', () => {
+    const fakeBitmap = { width: 100, height: 100, close: () => {} };
+    // Each test destroys its own fixture in afterEach -- otherwise a
+    // never-destroyed component's pending afterNextRender(openScanner())
+    // callback can fire during a LATER test's flush(), tearing down that
+    // later test's in-progress scan.
+    let activeFixture: ReturnType<typeof TestBed.createComponent<CardScannerComponent>> | null =
+      null;
+
+    beforeEach(() => {
+      FakeWorker.instances.length = 0;
+      vi.stubGlobal('Worker', FakeWorker);
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({}) }),
+      );
+      vi.stubGlobal(
+        'createImageBitmap',
+        vi.fn().mockResolvedValue(fakeBitmap as unknown as ImageBitmap),
+      );
+    });
+
+    afterEach(() => {
+      activeFixture?.destroy();
+      activeFixture = null;
+      vi.unstubAllGlobals();
+    });
+
+    function createImageScanner(game: 'magic' | 'pokemon' | 'lorcana' | 'onepiece' = 'magic') {
+      activeFixture = TestBed.createComponent(CardScannerComponent);
+      activeFixture.componentRef.setInput('game', game);
+      return activeFixture.componentInstance;
+    }
+
+    /** Flush the microtask queue (and any zero-delay timers) before continuing. */
+    function flush(): Promise<void> {
+      return new Promise(resolve => setTimeout(resolve, 0));
+    }
+
+    /** Drive a scanImage() call through worker init + a single result message. */
+    async function driveScan(
+      comp: CardScannerComponent,
+      file: File,
+      result: Record<string, unknown>,
+    ) {
+      // Mirrors real usage: the wrapper always calls pauseCamera() before a
+      // file can be dropped, which also protects against the auto-started
+      // openScanner() (via afterNextRender) later failing (no getUserMedia
+      // in JSDOM) and tearing down this in-progress image scan.
+      comp.pauseCamera();
+      const outcomePromise = comp.scanImage(file);
+      await flush(); // #fetchManifest + #spawnWorker
+      expect(FakeWorker.instances).toHaveLength(1);
+      const worker = FakeWorker.instances[0];
+      worker.emit({
+        type: 'ready',
+        inferenceMode: 'WASM',
+        numThreads: 1,
+        catalogRows: 0,
+        catalogTotalRows: 0,
+        catalogLimit: null,
+      });
+      await flush(); // createImageBitmap + #downscaleIfNeeded + postMessage
+      expect(worker.posted.some(m => (m as { type?: string }).type === 'frame')).toBe(true);
+      worker.emit({ type: 'result', ...result });
+      return outcomePromise;
+    }
+
+    it('resolves { ok: false, reason: "no-card" } when the worker finds no card, bypassing the multi-frame streak', async () => {
+      const comp = createImageScanner();
+      const file = new File(['x'], 'blank.jpg', { type: 'image/jpeg' });
+
+      const outcome = await driveScan(comp, file, {
+        cardPresent: false,
+        cornersValid: false,
+        confidence: 0.1,
+      });
+
+      expect(outcome).toEqual({ ok: false, reason: 'no-card', message: expect.any(String) });
+    });
+
+    it('resolves { ok: false, reason: "low-score" } when confidence is below minAcceptanceScore', async () => {
+      const comp = createImageScanner();
+      const file = new File(['x'], 'blurry.jpg', { type: 'image/jpeg' });
+
+      const outcome = await driveScan(comp, file, {
+        cardPresent: true,
+        cornersValid: true,
+        confidence: 0.9,
+        cardId: 'card-a',
+        score: 0.1,
+      });
+
+      expect(outcome).toEqual({ ok: false, reason: 'low-score', message: expect.any(String) });
+    });
+
+    it('resolves { ok: true, detection } and emits cardDetected from a single result (no second frame needed)', async () => {
+      const comp = createImageScanner();
+      const emitted: unknown[] = [];
+      comp.cardDetected.subscribe(d => emitted.push(d));
+      const file = new File(['x'], 'card.jpg', { type: 'image/jpeg' });
+
+      const outcome = await driveScan(comp, file, {
+        cardPresent: true,
+        cornersValid: true,
+        confidence: 0.95,
+        cardId: 'card-a',
+        score: 0.9,
+      });
+
+      expect(outcome).toMatchObject({ ok: true, detection: { cardId: 'card-a', score: 0.9 } });
+      expect(emitted).toHaveLength(1);
+    });
+
+    it('rejects when called while the live camera stream is active', async () => {
+      const fakeTrack = { stop: () => {} };
+      const fakeStream = { getTracks: () => [fakeTrack] } as unknown as MediaStream;
+      vi.stubGlobal('navigator', {
+        ...globalThis.navigator,
+        mediaDevices: { getUserMedia: vi.fn().mockResolvedValue(fakeStream) },
+      });
+      class FakeAudioContext {
+        state = 'running';
+        close() {
+          return Promise.resolve();
+        }
+      }
+      vi.stubGlobal('AudioContext', FakeAudioContext);
+
+      const comp = createImageScanner();
+      await comp.openScanner(); // no <video> rendered, so this resolves once the stream is acquired
+
+      await expect(
+        comp.scanImage(new File(['x'], 'card.jpg', { type: 'image/jpeg' })),
+      ).rejects.toThrow(/pauseCamera/);
+    });
+
+    it('does not spawn a second Worker across a pauseCamera()/resumeCamera() cycle', async () => {
+      const comp = createImageScanner();
+      const file = new File(['x'], 'card.jpg', { type: 'image/jpeg' });
+
+      await driveScan(comp, file, {
+        cardPresent: false,
+        cornersValid: false,
+        confidence: 0.1,
+      });
+      expect(FakeWorker.instances).toHaveLength(1);
+
+      comp.pauseCamera();
+      // No getUserMedia in JSDOM — resumeCamera() will fail to reacquire the
+      // stream, but must not touch the already-initialised worker either way.
+      await comp.resumeCamera().catch(() => undefined);
+
+      expect(FakeWorker.instances).toHaveLength(1);
     });
   });
 });
