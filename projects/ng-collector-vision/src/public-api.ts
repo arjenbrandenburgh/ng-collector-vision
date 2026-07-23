@@ -16,6 +16,8 @@ export type {
   WorkerResultMsg,
   WorkerErrorMsg,
   ConfirmedResult,
+  ImageScanFailureReason,
+  ImageScanOutcome,
 } from './lib/types';
 
 // Asset base path token

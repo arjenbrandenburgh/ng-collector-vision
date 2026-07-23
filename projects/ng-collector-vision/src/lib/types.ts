@@ -83,3 +83,13 @@ export interface CardDetection {
 
 /** Lifecycle states of the scanner. */
 export type ScannerStatus = 'idle' | 'requesting-permission' | 'downloading' | 'scanning' | 'error';
+
+// ── Still-image scanning ─────────────────────────────────────────────────────
+
+/** Why a `scanImage()` call did not produce a confirmed card. */
+export type ImageScanFailureReason = 'no-card' | 'low-score' | 'decode-error' | 'worker-error';
+
+/** Result of a single `scanImage()` call. */
+export type ImageScanOutcome =
+  | { ok: true; detection: CardDetection }
+  | { ok: false; reason: ImageScanFailureReason; message: string };

@@ -7,6 +7,9 @@ export const CORNER_OVERLAY_COLOUR = '#22c55e';
 
 export const WORKER_FILENAME = 'scanner.worker.mjs';
 
+/** Cap the longest edge of an uploaded image before handing it to the worker. */
+export const MAX_IMAGE_LONG_EDGE_PX = 2000;
+
 import type { CardScannerGame } from './types';
 
 export const GAME_OPTIONS: { value: CardScannerGame; label: string }[] = [
