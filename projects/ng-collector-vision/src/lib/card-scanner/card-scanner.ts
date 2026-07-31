@@ -83,7 +83,7 @@ export class CardScannerComponent {
   /** Cooldown in ms before the same card can be detected again. Default 3500. */
   readonly cooldownMs = input<number>(COOLDOWN_MS);
 
-  /** Group alternate printings of the same card by secondary ID (oracle ID). Default true. */
+  /** Group Scryfall printings by Oracle ID. Current TCGplayer catalogs fall back to card ID. */
   readonly groupBySecondaryId = input<boolean>(true);
 
   /** Interval between frame captures in ms. Default 900. */
@@ -598,6 +598,12 @@ export class CardScannerComponent {
     const needsReview = confirmed.score < this.reviewThreshold();
     const detection: CardDetection = {
       cardId: confirmed.cardId,
+      catalogKey: confirmed.catalogKey ?? '',
+      catalogRowKey: confirmed.catalogRowKey ?? '',
+      identifiers: { ...(confirmed.identifiers ?? {}) },
+      faceIndex: confirmed.faceIndex ?? 0,
+      finishes: [...(confirmed.finishes ?? [])],
+      resultIdentifier: confirmed.resultIdentifier ?? '',
       secondaryId: confirmed.secondaryId ?? null,
       secondaryIdField: confirmed.secondaryIdField ?? null,
       score: confirmed.score,

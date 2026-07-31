@@ -26,7 +26,7 @@ CollectorVision solves a hard computer vision problem: given a hand-held photo o
 | **Cornelius** | Corner detector | 384 × 384 video frame   | 4 corner points + presence confidence |
 | **Milo**      | Card embedder   | 448 × 448 dewarped crop | 128-dimensional fingerprint           |
 
-The fingerprint is matched against a catalog of ~108 k reference embeddings (cosine similarity, <10 ms on device). Catalogs are published as versioned `.npz` snapshots on [HuggingFace (HanClinto/milo)](https://huggingface.co/HanClinto/milo/tree/main/catalogs) and cached in IndexedDB after the first download.
+The fingerprint is matched against a catalog of reference embeddings (cosine similarity, <10 ms on device). CatalogV2 discovers compact FP16 bases and incremental updates from the [CollectorVision catalog feed](https://hanclinto.github.io/CollectorVisionCatalog/catalog-v2/catalog-feed-v2.json), verifies every asset, and caches the reconstructed snapshot in IndexedDB.
 
 **The full pipeline runs end-to-end in the browser, in a Web Worker, with no data ever leaving the device.**
 
@@ -106,7 +106,7 @@ For each game you want to scan, create a JSON manifest at:
 public/collectorvision/assets/<game>/manifest.json
 ```
 
-The manifest tells the worker where to find the ONNX models and which HuggingFace catalog to load:
+The manifest tells the worker where to find the ONNX models and which CatalogV2 descriptor to load:
 
 ```json
 {
@@ -116,23 +116,23 @@ The manifest tells the worker where to find the ONNX models and which HuggingFac
     "milo": "https://hanclinto.github.io/CollectorVision/assets/models/milo.onnx"
   },
   "catalog": {
-    "huggingface_key": "tcgplayer-mtg",
-    "dims": 128,
-    "rows": 0
+    "game": "magic-the-gathering",
+    "source": "tcgplayer"
   }
 }
 ```
 
-**Available catalogs** (from [HanClinto/milo on HuggingFace](https://huggingface.co/HanClinto/milo/tree/main/catalogs)):
+The demo keeps Magic on TCGplayer so existing consumers continue receiving
+TCGplayer product IDs. Set `"source": "scryfall"` to select Scryfall instead.
 
-| Game                 | `huggingface_key`    | Card ID format        |
-| -------------------- | -------------------- | --------------------- |
-| Magic: The Gathering | `tcgplayer-mtg`      | TCGplayer integer IDs |
-| Pokémon TCG          | `tcgplayer-pokemon`  | TCGplayer integer IDs |
-| Disney Lorcana       | `tcgplayer-lorcana`  | TCGplayer integer IDs |
-| One Piece Card Game  | `tcgplayer-onepiece` | TCGplayer integer IDs |
+| Game                 | `game`                | Default source |
+| -------------------- | --------------------- | -------------- |
+| Magic: The Gathering | `magic-the-gathering` | TCGplayer      |
+| Pokémon TCG          | `pokemon`             | TCGplayer      |
+| Disney Lorcana       | `lorcana`             | TCGplayer      |
+| One Piece Card Game  | `one-piece`           | TCGplayer      |
 
-Models (~10 MB combined) and catalogs (~1–53 MB depending on game) download once and are cached in IndexedDB. Subsequent launches are instant, even offline.
+Models and the latest reconstructed catalog snapshot download once and are cached in IndexedDB. Later CatalogV2 releases apply incremental updates rather than redownloading a monolithic snapshot.
 
 ### 4 — Provide HTTP client
 
@@ -188,18 +188,18 @@ export class MyScannerComponent {
 
 ### Inputs
 
-| Input                 | Type              | Default      | Description                                                                                                                                  |
-| --------------------- | ----------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `game`                | `CardScannerGame` | **required** | Active game. Changing this value restarts the scanner.                                                                                       |
-| `minCornerConfidence` | `number`          | `0.02`       | Cornelius gate threshold `[0–1]`. Raise to reduce false positives in cluttered scenes. Updated live — no restart required.                   |
-| `minAcceptanceScore`  | `number`          | `0.5`        | Minimum Milo cosine similarity before a frame is passed to the confirmation bucket `[0–1]`. Updated live.                                    |
-| `consecutiveMatches`  | `number`          | `2`          | Number of consecutive matching frames required before `cardDetected` fires. Higher = more certain, slower. Updated live.                     |
-| `cooldownMs`          | `number`          | `3500`       | Cooldown (ms) before the same card can fire `cardDetected` again. Updated live.                                                              |
-| `groupBySecondaryId`  | `boolean`         | `true`       | When `true`, alternate printings of the same card (same oracle/secondary ID) are grouped together for the confirmation streak. Updated live. |
-| `scanIntervalMs`      | `number`          | `900`        | Interval between frame captures (ms). Minimum `100` recommended. Updated live.                                                               |
-| `playSounds`          | `boolean`         | `true`       | Enable synthesized audio feedback.                                                                                                           |
-| `confidentSoundUrl`   | `string \| null`  | `null`       | WAV (or any Web Audio–decodable format) for a confident detection. `null` → synthesized two-note chime.                                      |
-| `uncertainSoundUrl`   | `string \| null`  | `null`       | Sound for a low-confidence detection. `null` → synthesized blip.                                                                             |
+| Input                 | Type              | Default      | Description                                                                                                                |
+| --------------------- | ----------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| `game`                | `CardScannerGame` | **required** | Active game. Changing this value restarts the scanner.                                                                     |
+| `minCornerConfidence` | `number`          | `0.02`       | Cornelius gate threshold `[0–1]`. Raise to reduce false positives in cluttered scenes. Updated live — no restart required. |
+| `minAcceptanceScore`  | `number`          | `0.5`        | Minimum Milo cosine similarity before a frame is passed to the confirmation bucket `[0–1]`. Updated live.                  |
+| `consecutiveMatches`  | `number`          | `2`          | Number of consecutive matching frames required before `cardDetected` fires. Higher = more certain, slower. Updated live.   |
+| `cooldownMs`          | `number`          | `3500`       | Cooldown (ms) before the same card can fire `cardDetected` again. Updated live.                                            |
+| `groupBySecondaryId`  | `boolean`         | `true`       | Group Scryfall printings by Oracle ID. Current TCGplayer catalogs fall back to product ID. Updated live.                   |
+| `scanIntervalMs`      | `number`          | `900`        | Interval between frame captures (ms). Minimum `100` recommended. Updated live.                                             |
+| `playSounds`          | `boolean`         | `true`       | Enable synthesized audio feedback.                                                                                         |
+| `confidentSoundUrl`   | `string \| null`  | `null`       | WAV (or any Web Audio–decodable format) for a confident detection. `null` → synthesized two-note chime.                    |
+| `uncertainSoundUrl`   | `string \| null`  | `null`       | Sound for a low-confidence detection. `null` → synthesized blip.                                                           |
 
 `CardScannerGame`:
 
@@ -252,7 +252,19 @@ interface CardDetection {
    *  Scryfall catalogs  → UUID            e.g. "abc123-..." */
   cardId: string;
 
-  /** Oracle ID or other secondary identifier, if the catalog includes one. */
+  /** Fully-qualified CatalogV2 catalog and stable source-qualified row key. */
+  catalogKey: string;
+  catalogRowKey: string;
+
+  /** Primary and peer provider identifiers for the matched printing. */
+  identifiers: Readonly<Record<string, string>>;
+
+  /** Face, finishes, and namespace represented by cardId. */
+  faceIndex: number;
+  finishes: readonly string[];
+  resultIdentifier: string;
+
+  /** Scryfall Oracle ID; null for current TCGplayer catalogs. */
   secondaryId: string | null;
 
   /** Name of the secondaryId field, e.g. "oracleId". */

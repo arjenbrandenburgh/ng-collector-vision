@@ -50,7 +50,7 @@
                 "input": "projects/demo/public"
               },
               {
-                "glob": "scanner.worker.mjs",
+                "glob": "*.mjs",
                 "input": "dist/ng-collector-vision/collectorvision",
                 "output": "/collectorvision"
               },

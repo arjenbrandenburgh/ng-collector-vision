@@ -19,7 +19,7 @@ This library is a thin Angular wrapper around **[CollectorVision](https://github
 
 - **Cornelius** — ONNX corner-detection model that locates card boundaries in a live video frame
 - **Milo** — ONNX embedding model that produces a 128-d fingerprint of the dewarped card crop
-- **Catalogs** — pre-built embedding databases hosted on [HuggingFace (HanClinto/milo)](https://huggingface.co/HanClinto/milo)
+- **CatalogV2** — compact FP16 catalogs and incremental updates discovered from the [CollectorVision catalog feed](https://hanclinto.github.io/CollectorVisionCatalog/catalog-v2/catalog-feed-v2.json)
 - **scanner.worker.mjs** — browser Web Worker that runs the full inference pipeline
 
 CollectorVision is licensed **AGPL-3.0**. Commercial use of the models and catalogs may require a separate license — see the [CollectorVision repository](https://github.com/HanClinto/CollectorVision) for details.
@@ -95,23 +95,22 @@ Supported game keys: `magic`, `pokemon`, `lorcana`, `onepiece`.
     "milo": "https://hanclinto.github.io/CollectorVision/assets/models/milo.onnx"
   },
   "catalog": {
-    "huggingface_key": "tcgplayer-mtg",
-    "dims": 128,
-    "rows": 0
+    "game": "magic-the-gathering",
+    "source": "tcgplayer"
   }
 }
 ```
 
-Available `huggingface_key` values (from [HanClinto/milo](https://huggingface.co/HanClinto/milo)):
+The bundled demo manifests select these CatalogV2 descriptors:
 
-| Key                  | Game                 | Card IDs              |
-| -------------------- | -------------------- | --------------------- |
-| `tcgplayer-mtg`      | Magic: The Gathering | TCGplayer integer IDs |
-| `tcgplayer-pokemon`  | Pokémon              | TCGplayer integer IDs |
-| `tcgplayer-lorcana`  | Lorcana              | TCGplayer integer IDs |
-| `tcgplayer-onepiece` | One Piece            | TCGplayer integer IDs |
+| `game`                | Game                 | Source    |
+| --------------------- | -------------------- | --------- |
+| `magic-the-gathering` | Magic: The Gathering | TCGplayer |
+| `pokemon`             | Pokémon              | TCGplayer |
+| `lorcana`             | Lorcana              | TCGplayer |
+| `one-piece`           | One Piece            | TCGplayer |
 
-> Models and catalogs are downloaded once and cached in IndexedDB — subsequent loads are instant and work offline.
+> Models and reconstructed catalogs are cached in IndexedDB. CatalogV2 applies incremental updates when the feed advances.
 
 ### 4. Provide HTTP client (`app.config.ts`)
 
@@ -158,7 +157,7 @@ export class MyComponent {
 | `reviewThreshold`     | `number`          | `0.8`        | Score below which a confirmed detection is flagged `needsReview` `[0–1]`. Applied live.        |
 | `consecutiveMatches`  | `number`          | `2`          | Consecutive matching frames needed before emitting `cardDetected`. Applied live.               |
 | `cooldownMs`          | `number`          | `3500`       | Cooldown (ms) before the same card can be detected again. Applied live.                        |
-| `groupBySecondaryId`  | `boolean`         | `true`       | Group alternate printings of the same card by oracle/secondary ID. Applied live.               |
+| `groupBySecondaryId`  | `boolean`         | `true`       | Group Scryfall printings by Oracle ID. Current TCGplayer catalogs fall back to card ID.        |
 | `scanIntervalMs`      | `number`          | `900`        | Interval between frame captures (ms). Minimum `100`. Applied live.                             |
 | `playSounds`          | `boolean`         | `true`       | Enable audio feedback. Set `false` for silent mode.                                            |
 | `confidentSoundUrl`   | `string \| null`  | `null`       | WAV URL for confident-scan sound. `null` → synthesized chime.                                  |
@@ -183,8 +182,14 @@ export class MyComponent {
 ```ts
 interface CardDetection {
   cardId: string; // Raw ID from the CollectorVision catalog
-  secondaryId: string | null; // Oracle ID or other secondary identifier
-  secondaryIdField: string | null; // Name of the secondary ID field, e.g. "oracleId"
+  catalogKey: string; // Fully-qualified CatalogV2 key
+  catalogRowKey: string; // Stable source-qualified row/face key
+  identifiers: Readonly<Record<string, string>>;
+  faceIndex: number;
+  finishes: readonly string[];
+  resultIdentifier: string; // Namespace represented by cardId
+  secondaryId: string | null; // Scryfall Oracle ID; null for current TCGplayer catalogs
+  secondaryIdField: string | null; // "oracleId" when secondaryId is present
   score: number; // Cosine similarity [0, 1]
   confidence: number; // Corner-detector confidence
   corners: [number, number][]; // Normalized corner coordinates
@@ -266,7 +271,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for full contribution guidelines.
 
 1. **Manifest** — fetched from `/collectorvision/assets/<game>/manifest.json`
 2. **Models** — Cornelius (corner detector) + Milo (embedder) ONNX models fetched from GitHub Pages and cached in IndexedDB
-3. **Catalog** — card embeddings downloaded from HuggingFace as `.npz`, parsed and cached in IndexedDB
+3. **CatalogV2** — a feed-selected FP16 base plus exact-predecessor updates is verified, reconstructed, and cached in IndexedDB
 4. **Worker** — every `scanIntervalMs` (default 900 ms) a video frame is sent to `scanner.worker.mjs` via `postMessage`
 5. **Confirmation** — `consecutiveMatches` (default 2) matching frames trigger a `cardDetected` event, with a `cooldownMs` (default 3.5 s) cooldown before the same card fires again
 
