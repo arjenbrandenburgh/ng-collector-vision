@@ -18,6 +18,7 @@
 //   { type: 'error',    message }
 
 import * as ort from './vendor/onnxruntime-web/ort.webgpu.min.mjs';
+import { BrowserCatalogV2, CatalogV2FeedClient } from './collectorvision-catalog-v2.mjs';
 
 // Asset base path received from the Angular component via the init message.
 // Matches CV_ASSET_BASE_PATH (default: 'collectorvision').
@@ -47,6 +48,12 @@ const IMAGENET_STD = [0.229, 0.224, 0.225];
 
 const ASSET_DB_NAME = 'collectorvision-web-scanner';
 const ASSET_STORE_NAME = 'assets';
+const LEGACY_CATALOG_SELECTIONS = Object.freeze({
+  'tcgplayer-mtg': { game: 'magic-the-gathering', source: 'tcgplayer' },
+  'tcgplayer-pokemon': { game: 'pokemon', source: 'tcgplayer' },
+  'tcgplayer-lorcana': { game: 'lorcana', source: 'tcgplayer' },
+  'tcgplayer-onepiece': { game: 'one-piece', source: 'tcgplayer' },
+});
 
 // ---------------------------------------------------------------------------
 // Math helpers (identical to the originals in app.js)
@@ -252,81 +259,64 @@ function chooseBetterMatch(current, candidate) {
   return candidate.score > current.score ? candidate : current;
 }
 
-function snakeToCamel(value) {
-  return String(value).replace(/_([a-zA-Z0-9])/g, (_, char) => char.toUpperCase());
-}
-
-function secondaryCatalogKeyToFieldName(catalogKey) {
-  const key = String(catalogKey ?? '').trim();
-  if (!key) {
-    return null;
+function resolveSecondaryIdentifier(match) {
+  const oracleId = match.identifiers.scryfall_oracle;
+  if (typeof oracleId === 'string' && oracleId.trim()) {
+    return { id: oracleId, field: 'oracleId' };
   }
-  const base = key.replace(/_ids$/i, '_id');
-  const fieldName = snakeToCamel(base);
-  return fieldName || null;
+  if (
+    match.result_identifier === 'tcgplayer_product' &&
+    typeof match.name === 'string' &&
+    match.name.trim()
+  ) {
+    return { id: match.name, field: 'name' };
+  }
+  return { id: null, field: null };
 }
 
-function resolveSecondaryIdSource(catalog = {}) {
-  const explicitPath = typeof catalog.secondary_ids === 'string' ? catalog.secondary_ids : null;
-  const explicitField =
-    typeof catalog.secondary_id_field === 'string' ? catalog.secondary_id_field : null;
-
-  if (explicitPath) {
+function resolveCatalogSelection(config = {}) {
+  if (typeof config.game === 'string' && config.game.trim()) {
     return {
-      assetPath: explicitPath,
-      fieldName: explicitField || 'secondaryId',
+      game: config.game,
+      source: config.source ?? 'tcgplayer',
+      family: config.family ?? 'milo1',
+      profile: config.profile ?? null,
+      includeMetadata: config.include_metadata === true,
+      feedUrl: config.feed_url,
     };
   }
-
-  const candidates = Object.entries(catalog)
-    .filter(([key, value]) => key !== 'card_ids' && /_ids$/i.test(key) && typeof value === 'string')
-    .sort(([a], [b]) => a.localeCompare(b));
-  if (candidates.length === 0) {
-    return null;
+  const legacy =
+    typeof config.huggingface_key === 'string' &&
+    Object.hasOwn(LEGACY_CATALOG_SELECTIONS, config.huggingface_key)
+      ? LEGACY_CATALOG_SELECTIONS[config.huggingface_key]
+      : null;
+  if (!legacy) {
+    throw new Error('Catalog manifest requires a CatalogV2 game descriptor');
   }
-
-  const [catalogKey, assetPath] = candidates[0];
   return {
-    assetPath,
-    fieldName: explicitField || secondaryCatalogKeyToFieldName(catalogKey) || 'secondaryId',
+    ...legacy,
+    family: 'milo1',
+    profile: null,
+    includeMetadata: false,
+    feedUrl: undefined,
   };
 }
 
-// ---------------------------------------------------------------------------
-// Float16 / catalog decode
-// ---------------------------------------------------------------------------
-
-function float16ToFloat32(value) {
-  const sign = (value & 0x8000) >> 15;
-  const exponent = (value & 0x7c00) >> 10;
-  const fraction = value & 0x03ff;
-
-  if (exponent === 0) {
-    if (fraction === 0) {
-      return sign ? -0 : 0;
-    }
-    return (sign ? -1 : 1) * 2 ** -14 * (fraction / 1024);
-  }
-
-  if (exponent === 0x1f) {
-    return fraction ? Number.NaN : sign ? -Infinity : Infinity;
-  }
-
-  return (sign ? -1 : 1) * 2 ** (exponent - 15) * (1 + fraction / 1024);
-}
-
-function createFloat16LookupTable() {
-  const table = new Float32Array(65536);
-  for (let value = 0; value < table.length; value += 1) {
-    table[value] = float16ToFloat32(value);
-  }
-  return table;
-}
-
-const FLOAT16_LOOKUP = createFloat16LookupTable();
-
-function wrapFloat16Buffer(buffer) {
-  return new Uint16Array(buffer);
+function limitCatalog(catalog, catalogLimit) {
+  if (!catalogLimit || catalogLimit >= catalog.rows) return catalog;
+  const rows = Math.min(catalogLimit, catalog.rows);
+  return new BrowserCatalogV2({
+    familyKey: catalog.familyKey,
+    catalogKey: catalog.catalogKey,
+    publicName: catalog.publicName,
+    descriptor: catalog.descriptor,
+    embedding: catalog.embedding,
+    version: catalog.version,
+    sourceUpdatedAt: catalog.sourceUpdatedAt,
+    records: catalog.records.slice(0, rows),
+    embeddings: catalog.embeddings.slice(0, rows * catalog.dimension),
+    metadataLoaded: catalog.metadataLoaded,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -370,308 +360,6 @@ async function writeCachedAsset(key, value) {
 }
 
 // ---------------------------------------------------------------------------
-// HuggingFace .npz catalog support
-//
-// The CollectorVision Python library publishes catalogs to HuggingFace as
-// NumPy archives (.npz).  The browser scanner originally expected pre-converted
-// .f32 + .json files, but those are only generated by the Python export script.
-// The functions below let us fetch .npz files from HuggingFace directly,
-// decompress and parse them in the worker, then cache the parsed result in
-// IndexedDB so subsequent sessions never re-download.
-//
-// .npz is just a ZIP file; each entry is a .npy file (NumPy array).
-// We only need two entries: embeddings.npy (float16 matrix) and card_ids.npy
-// (fixed-length string array).  No third-party libraries required — ZIP
-// decompression uses the browser's built-in DecompressionStream API.
-// ---------------------------------------------------------------------------
-
-async function decompressDeflateRaw(buffer) {
-  const chunks = [];
-  const sink = new WritableStream({
-    write(chunk) {
-      chunks.push(chunk);
-    },
-  });
-  const source = new ReadableStream({
-    start(ctrl) {
-      ctrl.enqueue(new Uint8Array(buffer));
-      ctrl.close();
-    },
-  });
-  try {
-    await source.pipeThrough(new DecompressionStream('deflate-raw')).pipeTo(sink);
-  } catch (err) {
-    // "Junk found after end of compressed data" (Chrome/Safari) or similar:
-    // The ZIP local-file-header's compressedSz can include trailing bytes such
-    // as a data descriptor (CRC + sizes) written after the DEFLATE end-of-stream
-    // marker.  By the time DecompressionStream reports the error, every valid
-    // decompressed byte is already in `chunks`.  Re-use those bytes instead of
-    // failing.  Only re-throw if nothing at all was produced (genuine error).
-    if (chunks.length === 0) throw err;
-  }
-  let size = 0;
-  for (const c of chunks) size += c.length;
-  const out = new Uint8Array(size);
-  let off = 0;
-  for (const c of chunks) {
-    out.set(c, off);
-    off += c.length;
-  }
-  return out.buffer;
-}
-
-async function extractFromNpz(npzBuffer, entryName) {
-  // Always read sizes from the Central Directory, not local file headers.
-  // Local headers can have compressedSz=0 or a wrong chunk-size value when the
-  // file was written with streaming (bit 3 of general purpose flag set) and the
-  // actual sizes were written in a data descriptor afterwards.
-  // The Central Directory, at the end of the archive, always has correct values.
-  const view = new DataView(npzBuffer);
-  const bytes = new Uint8Array(npzBuffer);
-
-  // Locate End-of-Central-Directory record (PK\x05\x06 = 0x06054b50).
-  let eocdOffset = -1;
-  for (let i = npzBuffer.byteLength - 22; i >= 0; i--) {
-    if (view.getUint32(i, true) === 0x06054b50) {
-      eocdOffset = i;
-      break;
-    }
-  }
-  if (eocdOffset < 0) throw new Error('NPZ: End of Central Directory not found');
-
-  const entryCount = view.getUint16(eocdOffset + 10, true);
-  const cdOffset = view.getUint32(eocdOffset + 16, true);
-
-  let pos = cdOffset;
-  for (let i = 0; i < entryCount; i++) {
-    if (pos + 46 > npzBuffer.byteLength) break;
-    if (view.getUint32(pos, true) !== 0x02014b50) break; // Central Directory sig
-
-    const comprMethod = view.getUint16(pos + 10, true);
-    const compressedSz = view.getUint32(pos + 20, true);
-    const nameLen = view.getUint16(pos + 28, true);
-    const extraLen = view.getUint16(pos + 30, true);
-    const commentLen = view.getUint16(pos + 32, true);
-    const localOffset = view.getUint32(pos + 42, true);
-    const name = new TextDecoder().decode(bytes.slice(pos + 46, pos + 46 + nameLen));
-
-    if (name === entryName) {
-      // Compute data start from the local file header (sizes come from the CD).
-      const lhNameLen = view.getUint16(localOffset + 26, true);
-      const lhExtraLen = view.getUint16(localOffset + 28, true);
-      const dataStart = localOffset + 30 + lhNameLen + lhExtraLen;
-
-      console.log(
-        `[CV] ZIP entry "${name}": method=${comprMethod} compressedSz=${compressedSz} dataStart=${dataStart}`,
-      );
-      const raw = npzBuffer.slice(dataStart, dataStart + compressedSz);
-      if (comprMethod === 0) return raw;
-      if (comprMethod === 8) return decompressDeflateRaw(raw);
-      throw new Error(`Unsupported ZIP compression method: ${comprMethod}`);
-    }
-
-    pos += 46 + nameLen + extraLen + commentLen;
-  }
-  throw new Error(`"${entryName}" not found in NPZ`);
-}
-
-function parseNpyHeader(buffer) {
-  const bytes = new Uint8Array(buffer);
-  const view = new DataView(buffer);
-  if (bytes[0] !== 0x93 || String.fromCharCode(...bytes.slice(1, 6)) !== 'NUMPY') {
-    throw new Error('Not a valid .npy file');
-  }
-  const major = bytes[6];
-  const hdrLen = major === 1 ? view.getUint16(8, true) : view.getUint32(8, true);
-  const hdrStart = major === 1 ? 10 : 12;
-  const header = new TextDecoder().decode(bytes.slice(hdrStart, hdrStart + hdrLen));
-  const dataStart = hdrStart + hdrLen;
-  const dtype = (header.match(/'descr':\s*'([^']+)'/) ?? [])[1] ?? '';
-  const shapeRaw = (header.match(/'shape':\s*\(([^)]*)\)/) ?? [])[1] ?? '';
-  const shape = shapeRaw
-    .split(',')
-    .map((s) => parseInt(s.trim(), 10))
-    .filter((n) => !isNaN(n));
-  return { dtype, shape, dataStart, buffer };
-}
-
-function npyToEmbeddings({ dtype, shape, dataStart, buffer }) {
-  const [rows, dims] = shape;
-
-  if (dtype === '<f2' || dtype === '|f2') {
-    // Already float16 — slice and return as-is.
-    return buffer.slice(dataStart, dataStart + rows * dims * 2);
-  }
-
-  if (dtype === '<f4') {
-    // HuggingFace catalogs store embeddings as float32.  Convert to float16 so
-    // the downstream cosine-search routine (which assumes 2 bytes/element) works
-    // without modification.
-    console.log(`[CV] Converting ${rows * dims} float32 values to float16…`);
-    const src = new Float32Array(buffer, dataStart, rows * dims);
-    const dst = new Uint16Array(rows * dims);
-    // Bit-level float32→float16 conversion (IEEE 754).
-    // Re-uses a single 4-byte scratch buffer to avoid per-element allocation.
-    const scratch = new DataView(new ArrayBuffer(4));
-    for (let i = 0; i < src.length; i++) {
-      scratch.setFloat32(0, src[i], true);
-      const b = scratch.getUint32(0, true);
-      const s = b >>> 31;
-      const e = (b >>> 23) & 0xff;
-      const m = b & 0x7fffff;
-      if (e === 0xff) {
-        dst[i] = (s << 15) | 0x7c00 | (m ? 0x0200 : 0); // NaN/Inf
-      } else if (e === 0) {
-        dst[i] = s << 15; // zero/denormal
-      } else {
-        const ne = e - 127 + 15;
-        dst[i] =
-          ne >= 31
-            ? (s << 15) | 0x7c00 // overflow → ±Inf
-            : ne <= 0
-              ? s << 15 // underflow → ±0
-              : (s << 15) | (ne << 10) | (m >>> 13); // normal
-      }
-    }
-    console.log(`[CV] float32→float16 conversion done`);
-    return dst.buffer;
-  }
-
-  throw new Error(`Unsupported embeddings dtype: ${dtype}`);
-}
-
-function npyToCardIds({ dtype, shape, dataStart, buffer }) {
-  const count = shape[0];
-  const ids = [];
-  const bytes = new Uint8Array(buffer);
-
-  if (dtype.startsWith('|S')) {
-    // Fixed-length byte strings, null-padded — typical for ASCII IDs.
-    const stride = parseInt(dtype.slice(2), 10);
-    for (let i = 0; i < count; i++) {
-      const base = dataStart + i * stride;
-      let end = base;
-      while (end < base + stride && bytes[end] !== 0) end++;
-      ids.push(String.fromCharCode(...bytes.subarray(base, end)));
-    }
-  } else if (dtype.startsWith('<U')) {
-    // UTF-32 LE strings — each char is 4 bytes.
-    // Fast path: card IDs (TCGplayer integers, Scryfall UUIDs) are pure ASCII.
-    // In UTF-32 LE, ASCII char 'X' is stored as [X, 0, 0, 0].  Reading only
-    // the first byte of each 4-byte unit avoids DataView.getUint32 overhead
-    // and allows a single String.fromCharCode(...) call per card.
-    const chars = parseInt(dtype.slice(2), 10);
-    const stride = chars * 4;
-    const buf = new Uint8Array(chars);
-    for (let i = 0; i < count; i++) {
-      const base = dataStart + i * stride;
-      let len = 0;
-      for (let j = 0; j < chars; j++) {
-        const b = bytes[base + j * 4];
-        if (b === 0) break;
-        buf[len++] = b;
-      }
-      ids.push(String.fromCharCode(...buf.subarray(0, len)));
-    }
-  } else if (dtype === '<i4' || dtype === '>i4') {
-    // 32-bit integer IDs (some TCGplayer catalogs store product IDs as int32).
-    const le = dtype === '<i4';
-    const view = new DataView(buffer);
-    for (let i = 0; i < count; i++) {
-      ids.push(String(view.getInt32(dataStart + i * 4, le)));
-    }
-  } else if (dtype === '<i8' || dtype === '>i8') {
-    // 64-bit integer IDs.
-    const le = dtype === '<i8';
-    const view = new DataView(buffer);
-    for (let i = 0; i < count; i++) {
-      ids.push(String(view.getBigInt64(dataStart + i * 8, le)));
-    }
-  } else {
-    throw new Error(`Unsupported card_ids dtype: ${dtype}`);
-  }
-  return ids;
-}
-
-async function resolveHuggingFaceUrl(catalogKey) {
-  // List files in the catalogs/ directory of the HuggingFace repo and pick the
-  // latest dated snapshot for the requested catalog key.
-  // Filenames: milo1-{catalog_key}-{YYYY-MM-DD}.npz  (lexicographic = chronological)
-  const resp = await fetch('https://huggingface.co/api/models/HanClinto/milo/tree/main/catalogs');
-  if (!resp.ok) throw new Error(`HuggingFace API error: ${resp.status}`);
-  const files = await resp.json();
-  const prefix = `catalogs/milo1-${catalogKey}-`;
-  const matches = files
-    .filter((f) => f.path?.startsWith(prefix) && f.path?.endsWith('.npz'))
-    .sort((a, b) => b.path.localeCompare(a.path)); // newest first (YYYY-MM-DD is lexicographic)
-  if (!matches.length) throw new Error(`No HuggingFace snapshot for: ${catalogKey}`);
-  return `https://huggingface.co/HanClinto/milo/resolve/main/${matches[0].path}`;
-}
-
-async function fetchHuggingFaceCatalog(catalogKey, onStage) {
-  try {
-    console.log(`[CV] Resolving HuggingFace URL for: ${catalogKey}`);
-    const npzUrl = await resolveHuggingFaceUrl(catalogKey);
-    const snapshotId = npzUrl.split('/').pop().replace('.npz', '');
-    console.log(`[CV] Resolved to snapshot: ${snapshotId}`);
-
-    const embedKey = `hf:${snapshotId}:embed`;
-    const idsKey = `hf:${snapshotId}:ids`;
-
-    const cachedEmbed = await readCachedAsset(embedKey);
-    const cachedIds = await readCachedAsset(idsKey);
-    if (cachedEmbed && cachedIds) {
-      console.log(`[CV] Serving ${catalogKey} from IndexedDB cache`);
-      onStage?.('catalog', 1, 1, 1, true);
-      return { embeddingBuffer: cachedEmbed, ids: cachedIds };
-    }
-
-    console.log(`[CV] Downloading ${npzUrl}`);
-    const npzBuffer = await fetchWithProgress(npzUrl, 'buffer', (ratio, loaded, total) => {
-      onStage?.('catalog', ratio * 0.85, loaded, total, false);
-    });
-    console.log(`[CV] NPZ downloaded: ${npzBuffer.byteLength} bytes`);
-    onStage?.('catalog', 0.85);
-
-    console.log('[CV] Extracting embeddings.npy from NPZ…');
-    const embedNpyBuf = await extractFromNpz(npzBuffer, 'embeddings.npy');
-    console.log(`[CV] embeddings.npy extracted: ${embedNpyBuf.byteLength} bytes`);
-    onStage?.('catalog', 0.88);
-
-    const embedNpy = parseNpyHeader(embedNpyBuf);
-    console.log(`[CV] embeddings dtype=${embedNpy.dtype} shape=${embedNpy.shape}`);
-    const embeddingBuffer = npyToEmbeddings(embedNpy);
-    console.log(`[CV] Embedding buffer ready: ${embeddingBuffer.byteLength} bytes`);
-    onStage?.('catalog', 0.91);
-
-    console.log('[CV] Extracting card_ids.npy from NPZ…');
-    const idsNpyBuf = await extractFromNpz(npzBuffer, 'card_ids.npy');
-    console.log(`[CV] card_ids.npy extracted: ${idsNpyBuf.byteLength} bytes`);
-    onStage?.('catalog', 0.93);
-
-    const idsNpy = parseNpyHeader(idsNpyBuf);
-    console.log(`[CV] card_ids dtype=${idsNpy.dtype} shape=${idsNpy.shape}`);
-    const ids = npyToCardIds(idsNpy);
-    console.log(`[CV] Decoded ${ids.length} card IDs. First: ${ids[0]}`);
-    onStage?.('catalog', 0.96);
-
-    console.log('[CV] Writing embeddings to IndexedDB…');
-    await writeCachedAsset(embedKey, embeddingBuffer);
-    onStage?.('catalog', 0.98);
-
-    console.log('[CV] Writing card IDs to IndexedDB…');
-    await writeCachedAsset(idsKey, ids);
-    console.log('[CV] Catalog ready.');
-    onStage?.('catalog', 1);
-
-    return { embeddingBuffer, ids };
-  } catch (err) {
-    console.error(`[CV] fetchHuggingFaceCatalog failed for "${catalogKey}":`, err);
-    throw err;
-  }
-}
-
-// ---------------------------------------------------------------------------
 // HTTP helpers with progress reporting + IndexedDB caching
 // ---------------------------------------------------------------------------
 
@@ -707,20 +395,6 @@ async function fetchWithProgress(url, responseType, onProgress) {
     return JSON.parse(await blob.text());
   }
   return await blob.arrayBuffer();
-}
-
-async function fetchJsonCached(url, version, onProgress) {
-  const key = `${version}:${url}:json`;
-  const cached = await readCachedAsset(key);
-  if (cached) {
-    onProgress?.(1, 1, 1, true);
-    return cached;
-  }
-  const json = await fetchWithProgress(url, 'json', (ratio, loaded, total) => {
-    onProgress?.(ratio, loaded, total, false);
-  });
-  await writeCachedAsset(key, json);
-  return json;
 }
 
 async function fetchBufferCached(url, version, onProgress) {
@@ -833,15 +507,12 @@ class WorkerRuntime {
     this.minCornerConfidence = clamp01(minCornerConfidence);
     this.catalogLimit =
       Number.isFinite(catalogLimit) && catalogLimit > 0 ? Math.floor(catalogLimit) : null;
-    this.catalogRows = manifest.catalog?.rows ?? 0;
-    this.catalogTotalRows = manifest.catalog?.rows ?? 0;
+    this.catalogRows = 0;
+    this.catalogTotalRows = 0;
     this.detector = null;
     this.embedder = null;
     this.inputNames = {};
-    this.embeddings = null;
-    this.cardIds = null;
-    this.secondaryIds = null;
-    this.secondaryIdField = null;
+    this.catalog = null;
     this.dewarpCanvas = new OffscreenCanvas(DEWARP_W, DEWARP_H);
     this.dewarpCtx = this.dewarpCanvas.getContext('2d', { willReadFrequently: true });
     this.dewarpImageData = this.dewarpCtx.createImageData(DEWARP_W, DEWARP_H);
@@ -912,64 +583,21 @@ class WorkerRuntime {
     this.inputNames.detector = this.detector.inputNames[0];
     this.inputNames.embedder = this.embedder.inputNames[0];
 
-    // Catalog loading: HuggingFace .npz path (no self-hosting required) or the
-    // standard pre-converted .f32 + .json path (for self-hosted / CDN assets).
-    let embeddingBuffer, ids;
-    if (this.manifest.catalog.huggingface_key) {
-      const hf = await fetchHuggingFaceCatalog(
-        this.manifest.catalog.huggingface_key,
-        (stage, ratio, loaded, total, cached) => onStage?.(stage, ratio, loaded, total, cached),
-      );
-      embeddingBuffer = hf.embeddingBuffer;
-      ids = hf.ids;
-    } else {
-      embeddingBuffer = await fetchBufferCached(
-        assetUrl(this.manifest.catalog.embeddings),
-        version,
-        (ratio, loaded, total, cached) => onStage?.('catalog', ratio * 0.92, loaded, total, cached),
-      );
-      ids = await fetchJsonCached(
-        assetUrl(this.manifest.catalog.card_ids),
-        version,
-        (ratio, loaded, total, cached) =>
-          onStage?.('catalog', 0.92 + ratio * 0.08, loaded, total, cached),
-      );
-    }
-    const secondarySource = resolveSecondaryIdSource(this.manifest.catalog);
-    const secondaryIds = secondarySource
-      ? await fetchJsonCached(assetUrl(secondarySource.assetPath), version)
-      : null;
-    // Keep the catalog in its packed float16 form.  Expanding the full MTG
-    // matrix to Float32Array roughly doubles steady-state catalog memory and
-    // can push iOS WebKit into tab reloads.  Search converts individual values
-    // through a 256 KB lookup table instead.
-    const dims = this.manifest.catalog.dims;
-    // When using HuggingFace catalogs the manifest has rows: 0 (unknown at
-    // authoring time); fall back to ids.length so requestedRows is correct.
-    const declaredRows = this.manifest.catalog.rows || ids.length;
-    const requestedRows = this.catalogLimit
-      ? Math.min(this.catalogLimit, declaredRows, ids.length)
-      : Math.min(declaredRows, ids.length);
-    const embeddingBytes = requestedRows * dims * 2;
-    // Diagnostic-only catalog limiting still fetches the monolithic asset, so
-    // it does not remove the transient load peak.  It does keep only the small
-    // prefix after load, which is enough to test steady-state catalog pressure.
-    const retainedEmbeddingBuffer =
-      requestedRows < declaredRows ? embeddingBuffer.slice(0, embeddingBytes) : embeddingBuffer;
-    this.embeddings = wrapFloat16Buffer(retainedEmbeddingBuffer);
-    this.cardIds = requestedRows < ids.length ? ids.slice(0, requestedRows) : ids;
-    this.secondaryIdField = secondarySource?.fieldName ?? null;
-    this.secondaryIds = Array.isArray(secondaryIds)
-      ? requestedRows < secondaryIds.length
-        ? secondaryIds.slice(0, requestedRows)
-        : secondaryIds
-      : null;
-    this.catalogRows = Math.min(
-      requestedRows,
-      this.cardIds.length,
-      Math.floor(this.embeddings.length / dims),
-    );
-    this.catalogTotalRows = declaredRows;
+    onStage?.('catalog', 0);
+    const catalogConfig = resolveCatalogSelection(this.manifest.catalog);
+    const catalogClient = new CatalogV2FeedClient({
+      feedUrl: catalogConfig.feedUrl,
+    });
+    const loadedCatalog = await catalogClient.loadGame(catalogConfig.game, {
+      source: catalogConfig.source,
+      family: catalogConfig.family,
+      profile: catalogConfig.profile,
+      includeMetadata: catalogConfig.includeMetadata,
+    });
+    this.catalogTotalRows = loadedCatalog.rows;
+    this.catalog = limitCatalog(loadedCatalog, this.catalogLimit);
+    this.catalogRows = this.catalog.rows;
+    onStage?.('catalog', 1);
   }
 
   async detect(frameCanvas) {
@@ -1151,32 +779,25 @@ class WorkerRuntime {
   }
 
   search(query) {
-    const dims = this.manifest.catalog.dims;
-    const rows = this.catalogRows ?? this.manifest.catalog.rows;
-    let bestScore = -Infinity;
-    let bestIndex = -1;
-
-    for (let row = 0; row < rows; row += 1) {
-      const offset = row * dims;
-      let score = 0;
-      for (let col = 0; col < dims; col += 1) {
-        score += FLOAT16_LOOKUP[this.embeddings[offset + col]] * query[col];
-      }
-      if (score > bestScore) {
-        bestScore = score;
-        bestIndex = row;
-      }
-    }
-
-    const secondaryId = this.secondaryIds?.[bestIndex] ?? null;
+    if (!this.catalog) throw new Error('Catalog v2 is not loaded');
+    const [match] = this.catalog.searchRecords(query, 1);
+    if (!match) throw new Error('Catalog v2 search returned no matches');
+    const secondary = resolveSecondaryIdentifier(match);
     const best = {
-      score: bestScore,
-      cardId: this.cardIds[bestIndex],
-      secondaryId,
-      secondaryIdField: this.secondaryIdField,
+      score: match.score,
+      cardId: match.id,
+      name: match.name,
+      catalogKey: this.catalog.catalogKey,
+      catalogRowKey: match.key,
+      identifiers: match.identifiers,
+      faceIndex: match.face_index,
+      finishes: match.finishes,
+      resultIdentifier: match.result_identifier,
+      secondaryId: secondary.id,
+      secondaryIdField: secondary.field,
     };
-    if (this.secondaryIdField && secondaryId !== null && secondaryId !== undefined) {
-      best[this.secondaryIdField] = secondaryId;
+    if (best.secondaryIdField && best.secondaryId !== null && best.secondaryId !== undefined) {
+      best[best.secondaryIdField] = best.secondaryId;
     }
     return best;
   }
@@ -1313,6 +934,13 @@ async function processFrame(bitmap, captureRequested = false, includeDebugBitmap
     sharpness: detection.sharpness,
     confidence: detection.confidence,
     cardId: best.cardId,
+    name: best.name,
+    catalogKey: best.catalogKey,
+    catalogRowKey: best.catalogRowKey,
+    identifiers: best.identifiers,
+    faceIndex: best.faceIndex,
+    finishes: best.finishes,
+    resultIdentifier: best.resultIdentifier,
     secondaryId: best.secondaryId,
     secondaryIdField: best.secondaryIdField,
     score: best.score,

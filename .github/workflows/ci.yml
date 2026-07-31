@@ -30,6 +30,11 @@ jobs:
       - name: TypeScript type-check (lib)
         run: npx tsc -p projects/ng-collector-vision/tsconfig.lib.json --noEmit
 
+      - name: Check runtime modules
+        run: |
+          node --check projects/ng-collector-vision/collectorvision/scanner.worker.mjs
+          node --check projects/ng-collector-vision/collectorvision/collectorvision-catalog-v2.mjs
+
   test:
     name: Unit tests
     runs-on: ubuntu-latest

@@ -5,8 +5,7 @@
     "milo": "https://hanclinto.github.io/CollectorVision/assets/models/milo.onnx"
   },
   "catalog": {
-    "huggingface_key": "tcgplayer-onepiece",
-    "dims": 128,
-    "rows": 0
+    "game": "one-piece",
+    "source": "tcgplayer"
   }
 }

@@ -1,6 +1,9 @@
 /** TCG game families supported by CollectorVision. */
 export type CardScannerGame = 'magic' | 'pokemon' | 'lorcana' | 'onepiece';
 
+/** Provider identifiers attached to a CatalogV2 recognition result. */
+export type CatalogIdentifiers = Readonly<Record<string, string>>;
+
 // ── Worker message types ────────────────────────────────────────────────────
 // These mirror the actual messages emitted by scanner.worker.mjs.
 
@@ -32,6 +35,13 @@ export interface WorkerResultMsg {
   confidence: number;
   sharpness?: number | null;
   cardId?: string | null;
+  name?: string | null;
+  catalogKey?: string | null;
+  catalogRowKey?: string | null;
+  identifiers?: CatalogIdentifiers;
+  faceIndex?: number | null;
+  finishes?: readonly string[];
+  resultIdentifier?: string | null;
   secondaryId?: string | null;
   secondaryIdField?: string | null;
   score?: number | null;
@@ -61,9 +71,23 @@ export type ConfirmedResult = WorkerResultMsg & { cardId: string; score: number 
 export interface CardDetection {
   /** Raw card identifier from the CollectorVision catalog (e.g. Scryfall UUID). */
   cardId: string;
-  /** Oracle ID or other secondary identifier, if the catalog includes one. */
+  /** Provider-published card or product name from the recognition layer. */
+  name: string;
+  /** Fully-qualified CatalogV2 key, including embedding family and source. */
+  catalogKey: string;
+  /** Stable source-qualified key for this catalog row and face. */
+  catalogRowKey: string;
+  /** Primary and peer provider identifiers for the matched printing. */
+  identifiers: CatalogIdentifiers;
+  /** Zero-based face index within the matched product. */
+  faceIndex: number;
+  /** Supported physical finishes published by the catalog source. */
+  finishes: readonly string[];
+  /** Identifier namespace represented by `cardId`. */
+  resultIdentifier: string;
+  /** Scryfall Oracle ID, or exact product name for TCGplayer catalogs. */
   secondaryId: string | null;
-  /** Name of the `secondaryId` field (e.g. `"oracleId"`). */
+  /** Name of the `secondaryId` field (`"oracleId"` or `"name"`). */
   secondaryIdField: string | null;
   /** Cosine similarity score, range [0, 1]. */
   score: number;

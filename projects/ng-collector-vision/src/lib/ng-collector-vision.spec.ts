@@ -487,10 +487,36 @@ describe('CardScannerComponent', () => {
         cornersValid: true,
         confidence: 0.95,
         cardId: 'card-a',
+        name: 'Pikachu',
+        catalogKey: 'milo1/tcgplayer/pokemon',
+        catalogRowKey: 'tcgplayer:card-a',
+        identifiers: {
+          tcgplayer_product: 'card-a',
+          pokemon_number: '42',
+        },
+        faceIndex: 1,
+        finishes: ['foil'],
+        resultIdentifier: 'tcgplayer_product',
         score: 0.9,
       });
 
-      expect(outcome).toMatchObject({ ok: true, detection: { cardId: 'card-a', score: 0.9 } });
+      expect(outcome).toMatchObject({
+        ok: true,
+        detection: {
+          cardId: 'card-a',
+          name: 'Pikachu',
+          catalogKey: 'milo1/tcgplayer/pokemon',
+          catalogRowKey: 'tcgplayer:card-a',
+          identifiers: {
+            tcgplayer_product: 'card-a',
+            pokemon_number: '42',
+          },
+          faceIndex: 1,
+          finishes: ['foil'],
+          resultIdentifier: 'tcgplayer_product',
+          score: 0.9,
+        },
+      });
       expect(emitted).toHaveLength(1);
     });
 
