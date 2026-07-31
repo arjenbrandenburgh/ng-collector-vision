@@ -487,6 +487,7 @@ describe('CardScannerComponent', () => {
         cornersValid: true,
         confidence: 0.95,
         cardId: 'card-a',
+        name: 'Pikachu',
         catalogKey: 'milo1/tcgplayer/pokemon',
         catalogRowKey: 'tcgplayer:card-a',
         identifiers: {
@@ -503,6 +504,7 @@ describe('CardScannerComponent', () => {
         ok: true,
         detection: {
           cardId: 'card-a',
+          name: 'Pikachu',
           catalogKey: 'milo1/tcgplayer/pokemon',
           catalogRowKey: 'tcgplayer:card-a',
           identifiers: {

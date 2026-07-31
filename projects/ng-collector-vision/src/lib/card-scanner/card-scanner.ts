@@ -598,6 +598,7 @@ export class CardScannerComponent {
     const needsReview = confirmed.score < this.reviewThreshold();
     const detection: CardDetection = {
       cardId: confirmed.cardId,
+      name: confirmed.name ?? confirmed.cardId,
       catalogKey: confirmed.catalogKey ?? '',
       catalogRowKey: confirmed.catalogRowKey ?? '',
       identifiers: { ...(confirmed.identifiers ?? {}) },

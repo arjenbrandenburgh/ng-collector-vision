@@ -260,11 +260,18 @@ function chooseBetterMatch(current, candidate) {
 }
 
 function resolveSecondaryIdentifier(match) {
-  // Only Scryfall currently publishes a card-equivalence identifier.
   const oracleId = match.identifiers.scryfall_oracle;
-  return typeof oracleId === 'string' && oracleId.trim()
-    ? { id: oracleId, field: 'oracleId' }
-    : { id: null, field: null };
+  if (typeof oracleId === 'string' && oracleId.trim()) {
+    return { id: oracleId, field: 'oracleId' };
+  }
+  if (
+    match.result_identifier === 'tcgplayer_product' &&
+    typeof match.name === 'string' &&
+    match.name.trim()
+  ) {
+    return { id: match.name, field: 'name' };
+  }
+  return { id: null, field: null };
 }
 
 function resolveCatalogSelection(config = {}) {
@@ -779,6 +786,7 @@ class WorkerRuntime {
     const best = {
       score: match.score,
       cardId: match.id,
+      name: match.name,
       catalogKey: this.catalog.catalogKey,
       catalogRowKey: match.key,
       identifiers: match.identifiers,
@@ -926,6 +934,7 @@ async function processFrame(bitmap, captureRequested = false, includeDebugBitmap
     sharpness: detection.sharpness,
     confidence: detection.confidence,
     cardId: best.cardId,
+    name: best.name,
     catalogKey: best.catalogKey,
     catalogRowKey: best.catalogRowKey,
     identifiers: best.identifiers,

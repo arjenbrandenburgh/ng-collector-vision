@@ -182,14 +182,15 @@ export class MyComponent {
 ```ts
 interface CardDetection {
   cardId: string; // Raw ID from the CollectorVision catalog
+  name: string; // Always-loaded provider card/product name
   catalogKey: string; // Fully-qualified CatalogV2 key
   catalogRowKey: string; // Stable source-qualified row/face key
   identifiers: Readonly<Record<string, string>>;
   faceIndex: number;
   finishes: readonly string[];
   resultIdentifier: string; // Namespace represented by cardId
-  secondaryId: string | null; // Scryfall Oracle ID; null for current TCGplayer catalogs
-  secondaryIdField: string | null; // "oracleId" when secondaryId is present
+  secondaryId: string | null; // Scryfall Oracle ID or TCGplayer product name
+  secondaryIdField: string | null; // "oracleId" or "name"
   score: number; // Cosine similarity [0, 1]
   confidence: number; // Corner-detector confidence
   corners: [number, number][]; // Normalized corner coordinates

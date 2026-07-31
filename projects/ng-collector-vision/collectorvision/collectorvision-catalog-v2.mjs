@@ -1,5 +1,4 @@
 // Client for the live CollectorVisionCatalog v2 contract.
-// Vendored from HanClinto/CollectorVision commit c316a70.
 //
 // The only document a normal client needs is the moving feed
 // (`catalog-feed-v2.json`). It nests catalogs under immutable embedding
@@ -21,12 +20,18 @@ const DEFAULT_FAMILY = 'milo1';
 const GAME_ALIASES = Object.freeze({
   mtg: 'magic-the-gathering',
   pokemon: 'pokemon',
+  pokemonjapan: 'pokemon-japan',
+  'pokemon-japan': 'pokemon-japan',
   yugioh: 'yugioh',
   fab: 'flesh-and-blood',
   lorcana: 'lorcana',
   digimon: 'digimon-card-game',
   onepiece: 'one-piece',
   swu: 'star-wars-unlimited',
+  unionarena: 'union-arena',
+  'union-arena': 'union-arena',
+  gundam: 'gundam-card-game',
+  riftbound: 'riftbound',
   dbs: 'dragon-ball-super-card-game',
 });
 
@@ -130,6 +135,7 @@ export class BrowserCatalogV2 {
     const result = {
       key,
       id: record.id,
+      name: record.name,
       identifiers: {
         [this.descriptor.result_identifier]: record.id,
         ...record.identifiers,
@@ -841,6 +847,7 @@ function isCompatibleSnapshot(snapshot, resolved, includeMetadata) {
 function parseIdentityRecord(value, descriptor, label) {
   if (!isObject(value)) throw new CatalogV2Error(`${label} must be a JSON object`);
   const id = requiredString(value.id, `${label} id`);
+  const name = requiredString(value.name, `${label} name`);
   if (!isObject(value.identifiers ?? {})) {
     throw new CatalogV2Error(`${label} identifiers must be an object`);
   }
@@ -873,7 +880,7 @@ function parseIdentityRecord(value, descriptor, label) {
       }
     }
   }
-  return { id, faceIndex, identifiers, finishes };
+  return { id, name, faceIndex, identifiers, finishes };
 }
 
 function parseIdentityTarget(value, label) {

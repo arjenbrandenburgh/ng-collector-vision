@@ -35,6 +35,7 @@ export interface WorkerResultMsg {
   confidence: number;
   sharpness?: number | null;
   cardId?: string | null;
+  name?: string | null;
   catalogKey?: string | null;
   catalogRowKey?: string | null;
   identifiers?: CatalogIdentifiers;
@@ -70,6 +71,8 @@ export type ConfirmedResult = WorkerResultMsg & { cardId: string; score: number 
 export interface CardDetection {
   /** Raw card identifier from the CollectorVision catalog (e.g. Scryfall UUID). */
   cardId: string;
+  /** Provider-published card or product name from the recognition layer. */
+  name: string;
   /** Fully-qualified CatalogV2 key, including embedding family and source. */
   catalogKey: string;
   /** Stable source-qualified key for this catalog row and face. */
@@ -82,9 +85,9 @@ export interface CardDetection {
   finishes: readonly string[];
   /** Identifier namespace represented by `cardId`. */
   resultIdentifier: string;
-  /** Scryfall Oracle ID; null for current TCGplayer catalogs. */
+  /** Scryfall Oracle ID, or exact product name for TCGplayer catalogs. */
   secondaryId: string | null;
-  /** Name of the `secondaryId` field (e.g. `"oracleId"`). */
+  /** Name of the `secondaryId` field (`"oracleId"` or `"name"`). */
   secondaryIdField: string | null;
   /** Cosine similarity score, range [0, 1]. */
   score: number;
